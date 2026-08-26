@@ -82,13 +82,19 @@ jobs:
       - name: 플랫폼 패키지 조립
         run: |
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            node npm/platforms/build.mjs "$key" "artifacts/sclean-$key/sclean" "${{ steps.version.outputs.value }}"
+            node ./npm/platforms/build.mjs "$key" "artifacts/sclean-$key/sclean" "${{ steps.version.outputs.value }}"
           done
 
+      # 이미 올라간 버전은 건너뛴다. 일부만 성공한 실행을 다시 돌릴 수 있어야 한다.
       - name: 플랫폼 패키지 배포
         run: |
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            npm publish "npm/platforms/$key" --access public --provenance
+            name="session-clean-$key@${{ steps.version.outputs.value }}"
+            if npm view "$name" version >/dev/null 2>&1; then
+              echo "$name 는 이미 배포되어 있습니다 — 건너뜁니다"
+              continue
+            fi
+            npm publish "./npm/platforms/$key" --access public --provenance
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -96,8 +102,13 @@ jobs:
       # 메인 패키지는 마지막에 — optionalDependencies 가 이미 존재해야 한다.
       - name: 메인 패키지 배포
         run: |
-          cp README.md LICENSE npm/session-clean/
-          npm publish npm/session-clean --access public --provenance
+          name="session-clean@${{ steps.version.outputs.value }}"
+          if npm view "$name" version >/dev/null 2>&1; then
+            echo "$name 는 이미 배포되어 있습니다 — 건너뜁니다"
+            exit 0
+          fi
+          cp README.md LICENSE ./npm/session-clean/
+          npm publish ./npm/session-clean --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
