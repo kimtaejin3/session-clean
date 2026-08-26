@@ -37,7 +37,7 @@ writeFileSync(
   join(outDir, "package.json"),
   JSON.stringify(
     {
-      name: `@session-clean/${key}`,
+      name: `session-clean-${key}`,
       version,
       description: `sclean native binary for ${key}`,
       license: "MIT",

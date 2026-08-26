@@ -8,11 +8,13 @@
 
 const { spawnSync } = require("node:child_process");
 
+// 스코프(@session-clean/...)를 쓰면 같은 이름의 npm 조직을 먼저 만들어야 한다.
+// 그 단계를 없애려고 스코프 없는 이름을 쓴다.
 const PACKAGES = {
-  "darwin-arm64": "@session-clean/darwin-arm64",
-  "darwin-x64": "@session-clean/darwin-x64",
-  "linux-x64": "@session-clean/linux-x64",
-  "linux-arm64": "@session-clean/linux-arm64",
+  "darwin-arm64": "session-clean-darwin-arm64",
+  "darwin-x64": "session-clean-darwin-x64",
+  "linux-x64": "session-clean-linux-x64",
+  "linux-arm64": "session-clean-linux-arm64",
 };
 
 const key = `${process.platform}-${process.arch}`;
