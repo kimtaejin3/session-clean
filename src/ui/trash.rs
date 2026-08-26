@@ -118,7 +118,7 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
     ];
     for s in sessions {
         lines.push(Line::styled(
-            format!("{} ({})", s.display_name, &s.session_id),
+            format!("{} ({})", s.display_name, s.session_id),
             Style::default().fg(ACCENT),
         ));
         if let Some(p) = &s.project_path {
