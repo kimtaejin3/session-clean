@@ -173,10 +173,19 @@ session-clean                      ← 사용자가 설치하는 것 (bin/sclean
 └── session-clean-linux-arm64
 ```
 
+`darwin-x64`는 Intel 러너 대기열이 길어 arm64 러너에서 크로스 컴파일합니다. 그 타깃은 실행할 수 없으므로 빌드만 검증합니다.
+
 태그를 밀면 GitHub Actions가 네 플랫폼을 빌드·테스트하고 npm과 GitHub 릴리스에 올립니다.
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0
+```
+
+CI 토큰이 npm의 2FA 정책에 막히면, 이미 빌드된 산출물을 받아 로컬에서 올릴 수 있습니다.
+
+```sh
+npm login                                  # OTP 직접 입력
+./scripts/publish-local.sh <run-id>        # gh run list --workflow=release.yml
 ```
 
 ## 아직 하지 않는 것 (v0.1)

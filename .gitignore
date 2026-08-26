@@ -1,5 +1,6 @@
 /target
 _workspace/
+.publish-artifacts/
 npm/platforms/darwin-*/
 npm/platforms/linux-*/
 npm/session-clean/README.md

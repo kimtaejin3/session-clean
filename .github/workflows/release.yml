@@ -88,7 +88,7 @@ jobs:
       - name: 플랫폼 패키지 배포
         run: |
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            npm publish "npm/platforms/$key" --access public
+            npm publish "npm/platforms/$key" --access public --provenance
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -97,7 +97,7 @@ jobs:
       - name: 메인 패키지 배포
         run: |
           cp README.md LICENSE npm/session-clean/
-          npm publish npm/session-clean --access public
+          npm publish npm/session-clean --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
