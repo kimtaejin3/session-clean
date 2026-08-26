@@ -104,9 +104,17 @@ impl Fixture {
 
     /// 대화 기록 없이 연결 데이터만 남긴다 (R5).
     pub fn orphan_env(&self, id: &str) {
+        self.orphan_env_aged(id, 0);
+    }
+
+    pub fn orphan_env_aged(&self, id: &str, age_days: i64) {
         let d = self.paths().sidecar_dir("session-env").join(id);
         std::fs::create_dir_all(&d).unwrap();
         std::fs::write(d.join("hook.sh"), b"echo hi").unwrap();
+        if age_days > 0 {
+            set_age(&d.join("hook.sh"), age_days * DAY);
+            set_age(&d, age_days * DAY);
+        }
     }
 
     pub fn orphan_task(&self, prefix: &str) {
