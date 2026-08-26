@@ -1,1 +1,6 @@
 /target
+_workspace/
+npm/platforms/darwin-*/
+npm/platforms/linux-*/
+npm/session-clean/README.md
+npm/session-clean/LICENSE

@@ -40,7 +40,7 @@ impl Paths {
         };
         let data_dir = match std::env::var_os("SCLEAN_DATA_DIR") {
             Some(v) => PathBuf::from(v),
-            None => home.join("Library/Application Support/sclean"),
+            None => default_data_dir(&home),
         };
         Ok(Paths {
             claude_dir,
@@ -94,6 +94,18 @@ impl Paths {
     }
 }
 
+/// 플랫폼 관례에 맞는 sclean 저장 위치.
+///
+/// macOS는 PRD §11.2가 지정한 `~/Library/Application Support/sclean`,
+/// Linux는 XDG 관례인 `~/.local/share/sclean`을 쓴다. `dirs::data_dir()`이
+/// 두 경우를 모두 알고 있으므로 그것을 따르고, 알아내지 못하면 홈 기준으로 되돌린다.
+fn default_data_dir(home: &Path) -> PathBuf {
+    match dirs::data_dir() {
+        Some(d) => d.join("sclean"),
+        None => home.join(".local/share/sclean"),
+    }
+}
+
 /// `projects/` 아래 인코딩된 디렉터리 이름을 사람이 읽을 수 있는 형태로 되돌린다.
 ///
 /// Claude는 `/Users/a/dev/b`를 `-Users-a-dev-b`로 인코딩한다. 이 변환은 손실이
@@ -129,6 +141,40 @@ mod tests {
         assert_eq!(p.config_file(), PathBuf::from("/d/config.json"));
         assert_eq!(p.log_file(), PathBuf::from("/d/sclean.log"));
         assert_eq!(p.trash_dir(), PathBuf::from("/d/trash"));
+    }
+
+    #[test]
+    fn default_data_dir_follows_platform_convention() {
+        let home = PathBuf::from("/home/x");
+        let dir = default_data_dir(&home);
+        assert!(dir.ends_with("sclean"));
+        if cfg!(target_os = "macos") {
+            assert!(
+                dir.to_string_lossy().contains("Application Support"),
+                "macOS는 PRD가 지정한 위치를 쓴다: {}",
+                dir.display()
+            );
+        } else {
+            assert!(
+                dir.to_string_lossy().contains(".local/share")
+                    || dir.to_string_lossy().contains("share"),
+                "Linux는 XDG 관례를 따른다: {}",
+                dir.display()
+            );
+        }
+    }
+
+    #[test]
+    fn env_override_wins_over_platform_default() {
+        // SAFETY: 이 테스트는 자기 프로세스의 환경변수만 건드린다.
+        unsafe {
+            std::env::set_var("SCLEAN_DATA_DIR", "/tmp/sclean-test-override");
+        }
+        let p = Paths::discover().unwrap();
+        assert_eq!(p.data_dir, PathBuf::from("/tmp/sclean-test-override"));
+        unsafe {
+            std::env::remove_var("SCLEAN_DATA_DIR");
+        }
     }
 
     #[test]

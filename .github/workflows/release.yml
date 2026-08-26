@@ -1,0 +1,101 @@
+name: Release
+
+# 태그를 밀면 플랫폼별로 빌드해서 npm 에 올린다.
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# 필요한 시크릿: NPM_TOKEN (npm 계정의 Automation 토큰)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build ${{ matrix.key }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 크로스 컴파일 툴체인을 피하려고 각 아키텍처의 네이티브 러너를 쓴다.
+          - key: darwin-arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+          - key: darwin-x64
+            runner: macos-13
+            target: x86_64-apple-darwin
+          - key: linux-x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - key: linux-arm64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --target ${{ matrix.target }}
+      - run: cargo build --release --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sclean-${{ matrix.key }}
+          path: target/${{ matrix.target }}/release/sclean
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 버전을 태그에서 가져온다
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: package.json 버전이 태그와 같은지 확인
+        run: |
+          declared=$(node -p "require('./npm/session-clean/package.json').version")
+          if [ "$declared" != "${{ steps.version.outputs.value }}" ]; then
+            echo "npm/session-clean/package.json 은 $declared, 태그는 ${{ steps.version.outputs.value }}" >&2
+            exit 1
+          fi
+
+      - name: 플랫폼 패키지 조립
+        run: |
+          for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            node npm/platforms/build.mjs "$key" "artifacts/sclean-$key/sclean" "${{ steps.version.outputs.value }}"
+          done
+
+      - name: 플랫폼 패키지 배포
+        run: |
+          for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            npm publish "npm/platforms/$key" --access public --provenance
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 메인 패키지는 마지막에 — optionalDependencies 가 이미 존재해야 한다.
+      - name: 메인 패키지 배포
+        run: |
+          cp README.md LICENSE npm/session-clean/
+          npm publish npm/session-clean --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub 릴리스 생성
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes artifacts/*/sclean
+        env:
+          GH_TOKEN: ${{ github.token }}

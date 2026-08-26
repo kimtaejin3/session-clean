@@ -1,0 +1,27 @@
+{
+  "name": "session-clean",
+  "version": "0.1.0",
+  "description": "Claude Code 세션을 프로젝트별로 확인하고 규칙 기반 추천으로 안전하게 정리하는 로컬 터미널 UI",
+  "keywords": ["claude", "claude-code", "cli", "tui", "cleanup", "sessions"],
+  "homepage": "https://github.com/kimtaejin3/session-clean#readme",
+  "bugs": "https://github.com/kimtaejin3/session-clean/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimtaejin3/session-clean.git"
+  },
+  "license": "MIT",
+  "author": "kimtaejin3",
+  "bin": {
+    "sclean": "bin/sclean.js"
+  },
+  "files": ["bin", "README.md"],
+  "engines": {
+    "node": ">=16"
+  },
+  "optionalDependencies": {
+    "@session-clean/darwin-arm64": "0.1.0",
+    "@session-clean/darwin-x64": "0.1.0",
+    "@session-clean/linux-x64": "0.1.0",
+    "@session-clean/linux-arm64": "0.1.0"
+  }
+}

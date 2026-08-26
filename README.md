@@ -5,10 +5,33 @@
 ## 설치
 
 ```sh
+npx session-clean
+```
+
+한 번만 써볼 거면 위 명령으로 충분합니다. 계속 쓰실 거면 전역 설치하세요.
+
+```sh
+npm install -g session-clean
+sclean
+```
+
+패키지 이름은 `session-clean`이고 **실행 명령은 `sclean`** 입니다.
+
+소스에서 직접 빌드하려면 Rust 1.85 이상(edition 2024)이 필요합니다.
+
+```sh
 cargo install --path .
 ```
 
-Rust 1.85 이상(edition 2024)이 필요합니다. 1차 검증 환경은 Apple Silicon macOS입니다.
+### 지원 플랫폼
+
+| 플랫폼 | 상태 |
+|---|---|
+| macOS arm64 / x64 | 지원 (1차 검증 환경은 Apple Silicon) |
+| Linux x64 / arm64 | 지원 |
+| Windows | 미지원 — unix 전용 파일시스템 API를 사용합니다 |
+
+설정과 휴지통은 macOS에서 `~/Library/Application Support/sclean`, Linux에서 `~/.local/share/sclean`에 저장됩니다.
 
 ## 실행
 
@@ -97,7 +120,7 @@ sclean
 ## 개발
 
 ```sh
-cargo test                       # 158개 테스트
+cargo test                       # 182개 테스트
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 cargo test --release --test perf_test -- --nocapture   # 2,000 세션 스캔 시간
