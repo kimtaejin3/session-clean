@@ -112,7 +112,24 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # 네 산출물의 파일 이름이 모두 sclean 이라 그대로 올리면 서로 덮어써서
+      # 업로드가 깨진다. 플랫폼 이름을 붙여 tar 로 묶는다.
+      - name: 릴리스 자산 준비
+        run: |
+          mkdir -p dist
+          for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            chmod +x "artifacts/sclean-$key/sclean"
+            tar -czf "dist/sclean-${{ steps.version.outputs.value }}-$key.tar.gz" \
+              -C "artifacts/sclean-$key" sclean
+          done
+          ls -l dist
+
       - name: GitHub 릴리스 생성
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes artifacts/*/sclean
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --generate-notes dist/*.tar.gz
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
