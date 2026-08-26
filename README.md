@@ -119,3 +119,7 @@ SCLEAN_CLAUDE_DIR=/tmp/fake-claude SCLEAN_DATA_DIR=/tmp/fake-sclean sclean
 - Codex·OpenCode 지원
 - Homebrew 배포
 - 공유 paste cache·전역 plan·telemetry 정리
+
+## 라이선스
+
+MIT — [LICENSE](LICENSE)
