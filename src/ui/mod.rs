@@ -1,1 +1,4 @@
-// placeholder
+//! TUI.
+
+pub mod app;
+pub mod theme;
