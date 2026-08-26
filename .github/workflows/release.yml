@@ -119,7 +119,7 @@ jobs:
           mkdir -p dist
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             chmod +x "artifacts/sclean-$key/sclean"
-            tar -czf "dist/sclean-${{ steps.version.outputs.value }}-$key.tar.gz" \
+            tar -czf "dist/session-clean-${{ steps.version.outputs.value }}-$key.tar.gz" \
               -C "artifacts/sclean-$key" sclean
           done
           ls -l dist
