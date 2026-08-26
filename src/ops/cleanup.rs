@@ -43,6 +43,9 @@ pub enum SkipReason {
     Changed,
     /// 스캔 이후 파일이 사라졌다.
     Missing,
+    /// 이 세션의 파일이 함께 정리되는 다른 세션의 폴더 안에 있다.
+    /// 하위 에이전트 기록이 부모 세션 폴더 안에 있는 경우가 그렇다.
+    CoveredByAnother,
     Blocked(Blocker),
 }
 
@@ -51,6 +54,7 @@ impl SkipReason {
         match self {
             SkipReason::Changed => "스캔 이후 변경됨".into(),
             SkipReason::Missing => "파일이 이미 없음".into(),
+            SkipReason::CoveredByAnother => "상위 세션과 함께 정리됨".into(),
             SkipReason::Blocked(b) => b.label().to_string(),
         }
     }
@@ -97,11 +101,9 @@ fn real_mover(from: &Path, to: &Path) -> io::Result<()> {
 pub fn preview(targets: &[CleanupTarget], live: &LiveSessions) -> CleanupPreview {
     let mut p = CleanupPreview::default();
     let mut projects = HashSet::new();
-    for t in targets {
-        if let Some(reason) = skip_reason(t, live) {
-            p.excluded.push((t.session.display_name.clone(), reason));
-            continue;
-        }
+    let (ready, excluded) = partition(targets, live);
+    p.excluded = excluded;
+    for t in ready {
         projects.insert(t.session.project_key.clone());
         p.sessions += 1;
         p.files += t.session.artifacts.len();
@@ -109,6 +111,50 @@ pub fn preview(targets: &[CleanupTarget], live: &LiveSessions) -> CleanupPreview
     }
     p.projects = projects.len();
     p
+}
+
+/// 실행 가능한 대상과 제외 목록으로 나눈다.
+///
+/// `preview`와 `execute`가 반드시 같은 판단을 쓰도록 한 곳에 모았다 —
+/// 확인 화면에 보인 세션 수와 실제로 실행되는 것이 어긋나면 안 된다.
+fn partition<'a>(
+    targets: &'a [CleanupTarget],
+    live: &LiveSessions,
+) -> (Vec<&'a CleanupTarget>, Vec<(String, SkipReason)>) {
+    let mut ready: Vec<&CleanupTarget> = Vec::new();
+    let mut excluded = Vec::new();
+    for t in targets {
+        match skip_reason(t, live) {
+            Some(r) => excluded.push((t.session.display_name.clone(), r)),
+            None => ready.push(t),
+        }
+    }
+
+    // 하위 에이전트 기록은 부모 세션 폴더(projects/<p>/<uuid>/subagents/) 안에 있다.
+    // 부모를 옮기면 함께 옮겨지므로, 따로 옮기려 들면 "파일이 없다"며 작업 전체가
+    // 롤백된다. 부모가 같은 작업에 들어 있으면 그 세션은 부모에게 맡기고 제외한다.
+    let paths: Vec<Vec<PathBuf>> = ready
+        .iter()
+        .map(|t| t.session.artifacts.iter().map(|a| a.path.clone()).collect())
+        .collect();
+    let mut keep = Vec::new();
+    for (i, target) in ready.iter().enumerate() {
+        let covered = !paths[i].is_empty()
+            && paths[i].iter().all(|path| {
+                paths.iter().enumerate().any(|(j, other)| {
+                    j != i && other.iter().any(|o| path != o && path.starts_with(o))
+                })
+            });
+        if covered {
+            excluded.push((
+                target.session.display_name.clone(),
+                SkipReason::CoveredByAnother,
+            ));
+        } else {
+            keep.push(*target);
+        }
+    }
+    (keep, excluded)
 }
 
 /// 이 세션을 정리에서 제외해야 하는가.
@@ -159,13 +205,8 @@ pub fn execute_with(
     };
 
     // --- 1~2단계: 재검증 ---
-    let mut ready: Vec<&CleanupTarget> = Vec::new();
-    for t in &targets {
-        match skip_reason(t, live) {
-            Some(r) => outcome.skipped.push((t.session.display_name.clone(), r)),
-            None => ready.push(t),
-        }
-    }
+    let (ready, excluded) = partition(&targets, live);
+    outcome.skipped = excluded;
     if ready.is_empty() {
         logging::info("cleanup aborted: no eligible sessions");
         return Ok(outcome);

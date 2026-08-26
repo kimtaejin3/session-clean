@@ -378,3 +378,52 @@ fn snapshot(root: &Path) -> Vec<(String, Vec<u8>)> {
     out.sort();
     out
 }
+
+#[test]
+fn selecting_a_parent_and_its_subagent_together_still_succeeds() {
+    // 하위 에이전트 기록은 부모 세션 폴더(projects/<p>/<uuid>/subagents/) 안에 있다.
+    // 둘 다 고르면 부모 폴더가 먼저 옮겨지면서 하위 에이전트 파일이 사라지고,
+    // 순진하게 구현하면 작업 전체가 롤백된다.
+    let f = Fixture::new();
+    let p = f.source_tree("agents");
+    let parent = f
+        .session(p.to_str().unwrap(), &uuid(60))
+        .user("부모 작업")
+        .tool_use("Task")
+        .age_days(120)
+        .build();
+    f.session(p.to_str().unwrap(), &uuid(61))
+        .subagent_of(&parent)
+        .user("하위 작업")
+        .tool_use("Grep")
+        .age_days(120)
+        .build();
+
+    let all = targets(&f);
+    assert_eq!(all.len(), 2);
+    let out = execute(&f.paths(), all, CleanupMode::Trash, &LiveSessions::empty()).unwrap();
+
+    assert!(!out.rolled_back, "롤백되면 안 된다: {out:?}");
+    assert!(out.failed.is_empty(), "{out:?}");
+    assert_eq!(
+        out.succeeded.len(),
+        1,
+        "부모가 하위 에이전트를 포함해 정리한다"
+    );
+    assert_eq!(out.skipped.len(), 1);
+    assert_eq!(out.skipped[0].1, SkipReason::CoveredByAnother);
+
+    // 부모 폴더와 그 안의 하위 에이전트 기록이 모두 사라진다.
+    let key = support::encode_key(f.source_tree("agents").to_str().unwrap());
+    let proj = f.paths().projects_dir().join(key);
+    assert!(!proj.join(format!("{parent}.jsonl")).exists());
+    assert!(!proj.join(&parent).exists());
+
+    // 복원하면 둘 다 돌아온다.
+    let ops = trash::list(&f.paths());
+    let r = trash::restore(&f.paths(), &ops[0].manifest.op_id, None).unwrap();
+    assert!(r.is_clean(), "{r:?}");
+    assert!(proj.join(format!("{parent}.jsonl")).exists());
+    assert!(proj.join(&parent).join("subagents").exists());
+    assert_eq!(scan(&f.paths()).session_count(), 2);
+}
