@@ -22,9 +22,13 @@ jobs:
           - key: darwin-arm64
             runner: macos-14
             target: aarch64-apple-darwin
+          # Intel macOS 러너(macos-13)는 무료 풀에서 대기열이 길다.
+          # 애플 툴체인이 두 아키텍처를 다 갖고 있으므로 arm64 러너에서
+          # 크로스 컴파일한다. 대신 이 타깃의 테스트는 실행할 수 없다.
           - key: darwin-x64
-            runner: macos-13
+            runner: macos-14
             target: x86_64-apple-darwin
+            cross: true
           - key: linux-x64
             runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -37,7 +41,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --target ${{ matrix.target }}
+      # 네이티브 러너에서만 테스트를 돌린다. 크로스 빌드는 컴파일만 검증한다.
+      - if: ${{ !matrix.cross }}
+        run: cargo test --target ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
