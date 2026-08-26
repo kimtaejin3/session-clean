@@ -7,7 +7,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
 pub fn render(frame: &mut Frame, app: &App, area: Rect) {
-    let box_area = centered(area, 70, 68);
+    let box_area = centered(area, 88, 92);
     frame.render_widget(Clear, box_area);
     let c = &app.config;
 

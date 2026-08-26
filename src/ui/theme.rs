@@ -72,6 +72,11 @@ pub fn display_width(text: &str) -> usize {
     text.chars().map(char_width).sum()
 }
 
+/// 한 글자가 차지하는 칸 수. 화면 버퍼를 다시 읽어야 하는 곳에서도 쓴다.
+pub fn display_width_of(c: char) -> usize {
+    char_width(c)
+}
+
 /// 한글·한자·가나·전각 기호는 두 칸.
 fn char_width(c: char) -> usize {
     let cp = c as u32;
