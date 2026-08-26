@@ -13,3 +13,4 @@ pub mod scan;
 pub mod ui;
 
 pub use paths::Paths;
+pub use scan::session::{Project, ScanResult, Session, SessionKind};
