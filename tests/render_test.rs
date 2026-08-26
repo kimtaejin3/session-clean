@@ -96,17 +96,82 @@ fn sessions_screen_shows_names_reasons_and_keys() {
     let app = ready_app(&f);
     let out = draw(&app, 110, 24, Screen::Sessions);
 
+    // 왼쪽: 프로젝트 목록과 프로젝트별 추천 수.
     assert!(out.contains("Projects"), "{out}");
-    assert!(out.contains("Sessions"));
     assert!(out.contains("shop-api"));
+    assert!(out.contains("추천 1"));
+    // 오른쪽: 고른 프로젝트의 세션만.
     assert!(out.contains("로그인 수정"), "세션 이름이 보여야 한다");
     assert!(out.contains("마지막 활동 후"), "추천 이유가 보여야 한다");
-    assert!(out.contains("추천 1"), "프로젝트별 추천 수");
     assert!(out.contains("[ ]"), "선택 상태를 기호로 표시");
     assert!(out.contains("★"), "추천을 기호로 표시");
     assert!(out.contains("Trash: 0"));
-    assert!(out.contains("Space 선택"), "핵심 조작은 항상 하단에");
+    assert!(
+        out.contains("→ 세션 보기"),
+        "지금 할 수 있는 조작을 안내한다"
+    );
     assert!(out.contains("아무것도 선택되지 않음"));
+}
+
+#[test]
+fn the_session_pane_is_titled_with_the_chosen_project() {
+    let f = Fixture::new();
+    let p = f.source_tree("portfolio");
+    f.session(p.to_str().unwrap(), &uuid(50))
+        .summary("포트폴리오 손보기")
+        .user("q1")
+        .user("q2")
+        .tool_use("Edit")
+        .age_days(61)
+        .build();
+    seeded(&f);
+    let mut app = ready_app(&f);
+
+    // 첫 프로젝트(portfolio)의 세션만.
+    let first = draw(&app, 110, 24, Screen::Sessions);
+    assert!(first.contains("포트폴리오 손보기"), "{first}");
+    assert!(
+        !first.contains("로그인 수정"),
+        "다른 프로젝트 세션이 섞이면 안 된다"
+    );
+
+    // 다음 프로젝트(shop-api)로 옮기면 내용이 바뀐다.
+    app.move_cursor(1);
+    let second = draw(&app, 110, 24, Screen::Sessions);
+    assert!(second.contains("로그인 수정"));
+    assert!(!second.contains("포트폴리오 손보기"));
+}
+
+#[test]
+fn the_focused_pane_is_marked_without_relying_on_colour() {
+    let f = Fixture::new();
+    seeded(&f);
+    let mut app = ready_app(&f);
+
+    // 세션 패널 제목에도 프로젝트 이름이 나오므로 커서 기호까지 함께 본다.
+    let on_projects = draw(&app, 110, 24, Screen::Sessions);
+    assert!(
+        on_projects.contains("▶ shop-api"),
+        "포커스된 패널의 커서가 보인다:\n{on_projects}"
+    );
+
+    app.focus_sessions();
+    // 세션은 최근 활동 순이므로 92일 세션은 두번째 줄에 있다.
+    app.move_cursor(1);
+    let on_sessions = draw(&app, 110, 24, Screen::Sessions);
+    let session_line = on_sessions
+        .lines()
+        .find(|l| l.contains("로그인 수정"))
+        .unwrap()
+        .to_string();
+    assert!(
+        session_line.contains("▶"),
+        "커서가 있는 세션은 기호로 드러난다:\n{on_sessions}"
+    );
+    assert!(
+        on_sessions.contains("← 프로젝트로"),
+        "돌아가는 방법을 안내한다"
+    );
 }
 
 #[test]
@@ -124,25 +189,34 @@ fn selecting_a_session_changes_its_visible_mark() {
 fn narrow_terminal_drops_columns_and_keeps_working() {
     let f = Fixture::new();
     seeded(&f);
-    let app = ready_app(&f);
+    let mut app = ready_app(&f);
+    app.focus_sessions();
 
     let wide = draw(&app, 110, 24, Screen::Sessions);
     assert!(
         wide.contains("KB") || wide.contains(" B"),
         "넓으면 크기 열이 있다"
     );
+    assert!(wide.contains("Projects"), "두 패널이 나란히");
 
     let medium = draw(&app, 80, 20, Screen::Sessions);
     assert!(medium.contains("로그인 수정"));
-    assert!(medium.contains("Projects"), "80칸에서는 프로젝트 패널 유지");
+    assert!(medium.contains("Projects"), "80칸에서도 두 패널 유지");
 
+    // 좁으면 한 번에 한 패널만. 지금은 세션 패널에 있다.
     let narrow = draw(&app, 60, 16, Screen::Sessions);
+    assert!(!narrow.contains("Projects"), "프로젝트 패널은 숨는다");
     assert!(
-        !narrow.contains("Projects"),
-        "좁으면 프로젝트 패널을 접는다"
+        narrow.contains("shop-api"),
+        "어느 프로젝트인지는 제목에 남는다"
     );
-    assert!(narrow.contains("shop-api"), "대신 헤더 줄로 보여준다");
     assert!(narrow.contains("로그인 수정"));
+
+    // 좁은 화면에서 왼쪽으로 가면 프로젝트 목록이 전체 폭으로 나온다.
+    app.focus_projects();
+    let narrow_projects = draw(&app, 60, 16, Screen::Sessions);
+    assert!(narrow_projects.contains("Projects"));
+    assert!(narrow_projects.contains("shop-api"));
 }
 
 #[test]
@@ -313,4 +387,57 @@ fn recovery_modal_explains_what_will_happen() {
     assert!(out.contains("중단된 작업 복구"));
     assert!(out.contains("덮어쓰지 않고"));
     assert!(out.contains("R 복구"));
+}
+
+#[test]
+#[ignore = "레이아웃 육안 확인용"]
+fn visual_dump() {
+    let f = Fixture::new();
+    let shop = f.source_tree("shop-api");
+    let port = f.source_tree("portfolio");
+    let gone = f.dir.path().join("work/삭제된-프로젝트");
+    for (root, n, days, name) in [
+        (&shop, 1u32, 92i64, "로그인 리다이렉트 수정"),
+        (&shop, 2, 12, "결제 API 리팩터링"),
+        (&shop, 3, 1, "어제 하던 작업"),
+    ] {
+        f.session(root.to_str().unwrap(), &uuid(n))
+            .summary(name)
+            .user("q1")
+            .user("q2")
+            .tool_use("Edit")
+            .with_env()
+            .age_days(days)
+            .build();
+    }
+    f.session(port.to_str().unwrap(), &uuid(4))
+        .summary("포트폴리오 정리")
+        .user("q")
+        .age_days(61)
+        .build();
+    f.session(gone.to_str().unwrap(), &uuid(5))
+        .summary("옛 프로젝트")
+        .user("q1")
+        .user("q2")
+        .tool_use("Bash")
+        .age_days(140)
+        .build();
+    f.orphan_env_aged(&uuid(60), 200);
+
+    let mut app = ready_app(&f);
+    app.project_cursor = 2;
+    println!(
+        "\n[프로젝트 패널에 포커스]\n{}",
+        draw(&app, 104, 16, Screen::Sessions)
+    );
+    app.focus_sessions();
+    app.toggle_current();
+    println!(
+        "\n[세션 패널에 포커스 + 선택]\n{}",
+        draw(&app, 104, 16, Screen::Sessions)
+    );
+    println!(
+        "\n[좁은 화면 68칸]\n{}",
+        draw(&app, 68, 12, Screen::Sessions)
+    );
 }

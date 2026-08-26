@@ -38,28 +38,6 @@ pub enum Focus {
     Sessions,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Row {
-    Project { key: String },
-    Session { project_key: String, id: String },
-}
-
-impl Row {
-    pub fn session_id(&self) -> Option<&str> {
-        match self {
-            Row::Session { id, .. } => Some(id),
-            Row::Project { .. } => None,
-        }
-    }
-
-    pub fn project_key(&self) -> &str {
-        match self {
-            Row::Project { key } => key,
-            Row::Session { project_key, .. } => project_key,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct ConfirmState {
     pub preview: CleanupPreview,
@@ -94,10 +72,11 @@ pub struct App {
     pub verdicts: HashMap<String, Verdict>,
     pub live: LiveSessions,
 
-    pub rows: Vec<Row>,
-    pub cursor: usize,
+    /// 왼쪽 패널 커서 — `visible_projects()` 안의 위치.
+    pub project_cursor: usize,
+    /// 오른쪽 패널 커서 — 현재 프로젝트의 `visible_sessions()` 안의 위치.
+    pub session_cursor: usize,
     pub selected: HashSet<String>,
-    pub collapsed: HashSet<String>,
 
     pub search: String,
     pub searching: bool,
@@ -141,15 +120,14 @@ impl App {
             result: ScanResult::default(),
             verdicts: HashMap::new(),
             live,
-            rows: Vec::new(),
-            cursor: 0,
+            project_cursor: 0,
+            session_cursor: 0,
             selected: HashSet::new(),
-            collapsed: HashSet::new(),
             search: String::new(),
             searching: false,
             screen,
             previous_screen: Screen::Sessions,
-            focus: Focus::Sessions,
+            focus: Focus::Projects,
             confirm: ConfirmState::default(),
             outcome: None,
             restore_outcome: None,
@@ -176,7 +154,7 @@ impl App {
                 self.scan_state = ScanState::Ready;
                 self.now = now_secs();
                 self.recompute_verdicts();
-                self.rebuild_rows();
+                self.clamp_cursors();
                 // PRD §6: 시작 시 추천 세션을 자동으로 선택하지 않는다.
                 self.selected.clear();
                 let n = self.result.session_count();
@@ -211,58 +189,103 @@ impl App {
         self.verdicts.get(id)
     }
 
-    // ---------- 행 구성 ----------
+    // ---------- 보이는 항목 ----------
+    //
+    // 왼쪽에서 고른 프로젝트의 세션만 오른쪽에 보인다. 두 패널은 각자
+    // 커서를 갖고, `←` `→` 로 어느 쪽을 움직일지 정한다.
 
-    pub fn rebuild_rows(&mut self) {
-        let needle = self.search.to_lowercase();
-        let mut rows = Vec::new();
-        for project in &self.result.projects {
-            let project_hit = needle.is_empty()
-                || project.label.to_lowercase().contains(&needle)
-                || project.short_label().to_lowercase().contains(&needle);
-            let matching: Vec<&crate::scan::session::Session> = project
-                .sessions
-                .iter()
-                .filter(|s| project_hit || s.matches(&needle))
-                .collect();
-            if matching.is_empty() {
-                continue;
-            }
-            rows.push(Row::Project {
-                key: project.key.clone(),
-            });
-            if self.collapsed.contains(&project.key) {
-                continue;
-            }
-            for s in matching {
-                rows.push(Row::Session {
-                    project_key: project.key.clone(),
-                    id: s.id.clone(),
-                });
-            }
-        }
-        self.rows = rows;
-        if self.cursor >= self.rows.len() {
-            self.cursor = self.rows.len().saturating_sub(1);
-        }
+    fn needle(&self) -> String {
+        self.search.to_lowercase()
     }
 
-    pub fn current_row(&self) -> Option<&Row> {
-        self.rows.get(self.cursor)
+    fn project_matches(&self, p: &crate::scan::session::Project, needle: &str) -> bool {
+        needle.is_empty()
+            || p.label.to_lowercase().contains(needle)
+            || p.short_label().to_lowercase().contains(needle)
+    }
+
+    /// 검색을 통과한 프로젝트들의 인덱스.
+    ///
+    /// 프로젝트 이름이 맞거나, 그 안에 맞는 세션이 하나라도 있으면 보인다.
+    pub fn visible_projects(&self) -> Vec<usize> {
+        let needle = self.needle();
+        self.result
+            .projects
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                self.project_matches(p, &needle) || p.sessions.iter().any(|s| s.matches(&needle))
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    pub fn current_project(&self) -> Option<&crate::scan::session::Project> {
+        let visible = self.visible_projects();
+        let idx = *visible.get(self.project_cursor)?;
+        self.result.projects.get(idx)
+    }
+
+    /// 현재 프로젝트에서 검색을 통과한 세션들.
+    ///
+    /// 프로젝트 이름으로 찾았다면 그 안의 세션은 모두 보여준다 —
+    /// "shop-api" 를 검색했는데 세션이 하나도 안 보이면 당황스럽다.
+    pub fn visible_sessions(&self) -> Vec<&crate::scan::session::Session> {
+        let needle = self.needle();
+        let Some(project) = self.current_project() else {
+            return Vec::new();
+        };
+        let show_all = self.project_matches(project, &needle);
+        project
+            .sessions
+            .iter()
+            .filter(|s| show_all || s.matches(&needle))
+            .collect()
+    }
+
+    pub fn current_session(&self) -> Option<&crate::scan::session::Session> {
+        self.visible_sessions().get(self.session_cursor).copied()
+    }
+
+    pub fn current_session_id(&self) -> Option<String> {
+        self.current_session().map(|s| s.id.clone())
+    }
+
+    /// 목록이 줄어들었을 때 커서가 밖으로 나가지 않게 한다.
+    pub fn clamp_cursors(&mut self) {
+        let projects = self.visible_projects().len();
+        if projects == 0 {
+            self.project_cursor = 0;
+            self.session_cursor = 0;
+            return;
+        }
+        self.project_cursor = self.project_cursor.min(projects - 1);
+        let sessions = self.visible_sessions().len();
+        self.session_cursor = self.session_cursor.min(sessions.saturating_sub(1));
     }
 
     pub fn session(&self, id: &str) -> Option<&crate::scan::session::Session> {
         self.result.sessions().find(|s| s.id == id)
     }
 
-    /// 화면에 보이는 세션 중 추천 대상.
+    /// 화면(=현재 검색)에서 추천으로 표시된 세션 전체.
+    /// 왼쪽에서 고른 프로젝트뿐 아니라 검색에 걸린 모든 프로젝트가 대상이다
+    /// — PRD §8.5의 "현재 필터에서 추천 항목 전체".
     pub fn visible_recommended(&self) -> Vec<String> {
-        self.rows
-            .iter()
-            .filter_map(|r| r.session_id())
-            .filter(|id| self.verdicts.get(*id).is_some_and(|v| v.recommended()))
-            .map(|s| s.to_string())
-            .collect()
+        let needle = self.needle();
+        let mut out = Vec::new();
+        for idx in self.visible_projects() {
+            let project = &self.result.projects[idx];
+            let show_all = self.project_matches(project, &needle);
+            for s in &project.sessions {
+                if (show_all || s.matches(&needle))
+                    && self.verdicts.get(&s.id).is_some_and(|v| v.recommended())
+                {
+                    out.push(s.id.clone());
+                }
+            }
+        }
+        out
     }
 
     pub fn recommended_ids(&self) -> Vec<String> {
@@ -273,24 +296,42 @@ impl App {
             .collect()
     }
 
+    /// 프로젝트별 추천 개수 — 왼쪽 패널에 표시한다.
+    pub fn recommended_in(&self, project: &crate::scan::session::Project) -> usize {
+        project
+            .sessions
+            .iter()
+            .filter(|s| self.verdicts.get(&s.id).is_some_and(|v| v.recommended()))
+            .count()
+    }
+
+    pub fn selected_in(&self, project: &crate::scan::session::Project) -> usize {
+        project
+            .sessions
+            .iter()
+            .filter(|s| self.selected.contains(&s.id))
+            .count()
+    }
+
     // ---------- 선택 ----------
 
+    /// `Space`. 왼쪽 패널에서는 프로젝트의 세션을 한꺼번에, 오른쪽에서는 하나만.
     pub fn toggle_current(&mut self) {
-        let Some(row) = self.rows.get(self.cursor).cloned() else {
-            return;
-        };
-        match row {
-            Row::Session { id, .. } => self.toggle_session(&id),
-            Row::Project { key } => {
-                // 프로젝트 행에서는 그 프로젝트의 정리 가능한 세션을 한꺼번에 토글한다.
+        match self.focus {
+            Focus::Sessions => {
+                if let Some(id) = self.current_session_id() {
+                    self.toggle_session(&id);
+                }
+            }
+            Focus::Projects => {
                 let ids: Vec<String> = self
-                    .rows
+                    .visible_sessions()
                     .iter()
-                    .filter_map(|r| match r {
-                        Row::Session { project_key, id } if *project_key == key => Some(id.clone()),
-                        _ => None,
-                    })
+                    .map(|s| s.id.clone())
                     .collect();
+                if ids.is_empty() {
+                    return;
+                }
                 let all_on = ids.iter().all(|i| self.selected.contains(i));
                 for id in ids {
                     if all_on {
@@ -299,6 +340,7 @@ impl App {
                         self.selected.insert(id);
                     }
                 }
+                self.status = format!("{}개 선택됨", self.selected.len());
             }
         }
     }
@@ -331,6 +373,7 @@ impl App {
             return;
         }
         let all_on = ids.iter().all(|i| self.selected.contains(i));
+        let count = ids.len();
         for id in ids {
             if all_on {
                 self.selected.remove(&id);
@@ -338,7 +381,14 @@ impl App {
                 self.selected.insert(id);
             }
         }
-        self.status = format!("{}개 선택됨", self.selected.len());
+        // 현재 보고 있는 프로젝트뿐 아니라 검색에 걸린 전부가 대상이므로
+        // 몇 개 프로젝트에 걸쳐 있는지까지 밝힌다.
+        let projects = self.visible_projects().len();
+        self.status = if all_on {
+            format!("추천 {count}개 선택 해제")
+        } else {
+            format!("추천 {count}개 선택 (프로젝트 {projects}개)")
+        };
     }
 
     pub fn selected_targets(&self) -> Vec<CleanupTarget> {
@@ -359,27 +409,56 @@ impl App {
     // ---------- 이동 ----------
 
     pub fn move_cursor(&mut self, delta: isize) {
-        if self.rows.is_empty() {
+        match self.focus {
+            Focus::Projects => {
+                let last = self.visible_projects().len() as isize - 1;
+                if last < 0 {
+                    return;
+                }
+                let next = (self.project_cursor as isize + delta).clamp(0, last) as usize;
+                if next != self.project_cursor {
+                    self.project_cursor = next;
+                    // 다른 프로젝트로 옮겼으니 세션 커서는 처음으로.
+                    self.session_cursor = 0;
+                }
+            }
+            Focus::Sessions => {
+                let last = self.visible_sessions().len() as isize - 1;
+                if last < 0 {
+                    return;
+                }
+                self.session_cursor =
+                    (self.session_cursor as isize + delta).clamp(0, last) as usize;
+            }
+        }
+    }
+
+    pub fn cursor_home(&mut self) {
+        match self.focus {
+            Focus::Projects => {
+                self.project_cursor = 0;
+                self.session_cursor = 0;
+            }
+            Focus::Sessions => self.session_cursor = 0,
+        }
+    }
+
+    pub fn cursor_end(&mut self) {
+        self.move_cursor(isize::MAX / 2);
+    }
+
+    /// `→` — 프로젝트에서 세션 목록으로.
+    pub fn focus_sessions(&mut self) {
+        if self.visible_sessions().is_empty() {
+            self.status = "이 프로젝트에는 보여줄 세션이 없습니다".into();
             return;
         }
-        let last = self.rows.len() as isize - 1;
-        let next = (self.cursor as isize + delta).clamp(0, last);
-        self.cursor = next as usize;
+        self.focus = Focus::Sessions;
     }
 
-    pub fn collapse_current(&mut self) {
-        if let Some(row) = self.rows.get(self.cursor).cloned() {
-            let key = row.project_key().to_string();
-            self.collapsed.insert(key);
-            self.rebuild_rows();
-        }
-    }
-
-    pub fn expand_current(&mut self) {
-        if let Some(row) = self.rows.get(self.cursor).cloned() {
-            self.collapsed.remove(row.project_key());
-            self.rebuild_rows();
-        }
+    /// `←` — 세션에서 프로젝트 목록으로.
+    pub fn focus_projects(&mut self) {
+        self.focus = Focus::Projects;
     }
 
     // ---------- 정리 ----------
@@ -432,6 +511,7 @@ impl App {
             }
         }
         self.trash_ops = trash::list(&self.paths);
+        self.clamp_cursors();
         self.screen = Screen::Result;
     }
 
@@ -617,7 +697,7 @@ impl App {
             self.status = format!("설정을 저장하지 못했습니다: {e:#}");
         }
         self.recompute_verdicts();
-        self.rebuild_rows();
+        self.clamp_cursors();
     }
 
     // ---------- 검색 ----------
@@ -628,18 +708,26 @@ impl App {
 
     pub fn push_search(&mut self, c: char) {
         self.search.push(c);
-        self.rebuild_rows();
+        self.on_search_changed();
     }
 
     pub fn pop_search(&mut self) {
         self.search.pop();
-        self.rebuild_rows();
+        self.on_search_changed();
     }
 
     pub fn clear_search(&mut self) {
         self.search.clear();
         self.searching = false;
-        self.rebuild_rows();
+        self.on_search_changed();
+    }
+
+    /// 검색이 바뀌면 보이는 목록이 통째로 달라지므로 커서를 처음으로 되돌린다.
+    fn on_search_changed(&mut self) {
+        self.project_cursor = 0;
+        self.session_cursor = 0;
+        self.focus = Focus::Projects;
+        self.clamp_cursors();
     }
 
     pub fn total_selected_bytes(&self) -> u64 {

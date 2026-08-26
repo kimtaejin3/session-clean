@@ -247,19 +247,41 @@ fn ctrl_c_quits_from_the_sessions_screen() {
 }
 
 #[test]
-fn arrow_navigation_moves_through_every_row() {
+fn right_arrow_opens_the_selected_projects_sessions() {
     let f = Fixture::new();
     seeded(&f);
     let mut app = ready_app(&f);
-    let rows = app.rows.len();
-    for _ in 0..rows * 2 {
-        press(&mut app, KeyCode::Down);
-    }
-    assert_eq!(app.cursor, rows - 1);
+    assert_eq!(app.focus, sclean::ui::app::Focus::Projects);
+
+    // 프로젝트 하나뿐이므로 그 프로젝트의 세션 2개가 보인다.
+    press(&mut app, KeyCode::Right);
+    assert_eq!(app.focus, sclean::ui::app::Focus::Sessions);
+    assert_eq!(app.visible_sessions().len(), 2);
+
+    press(&mut app, KeyCode::Down);
+    assert_eq!(app.session_cursor, 1);
+    press(&mut app, KeyCode::Down);
+    assert_eq!(app.session_cursor, 1, "목록 끝에서 멈춘다");
     press(&mut app, KeyCode::Home);
-    assert_eq!(app.cursor, 0);
+    assert_eq!(app.session_cursor, 0);
     press(&mut app, KeyCode::End);
-    assert_eq!(app.cursor, rows - 1);
+    assert_eq!(app.session_cursor, 1);
+
+    press(&mut app, KeyCode::Left);
+    assert_eq!(app.focus, sclean::ui::app::Focus::Projects);
+}
+
+#[test]
+fn space_selects_the_session_under_the_cursor() {
+    let f = Fixture::new();
+    let old = seeded(&f);
+    let mut app = ready_app(&f);
+    press(&mut app, KeyCode::Right);
+    // 최근 활동 순 정렬이라 92일 세션이 아래에 있다.
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Char(' '));
+    assert_eq!(app.selected.len(), 1);
+    assert!(app.selected.contains(&old));
 }
 
 #[test]

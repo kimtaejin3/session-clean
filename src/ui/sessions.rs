@@ -6,29 +6,35 @@
 //! - 폭 <  72 : 프로젝트 패널을 접고 프로젝트를 트리 헤더 줄로 보여준다
 
 use crate::ops::fsutil::human_bytes;
-use crate::ui::app::{App, Focus, Row};
+use crate::ui::app::{App, Focus};
 use crate::ui::theme::{self, *};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
 pub struct Layout2 {
     pub show_size: bool,
-    pub show_project_pane: bool,
+    /// 두 패널을 나란히 보여줄 수 있는가. 좁으면 포커스된 쪽만 전체 폭으로 그린다.
+    pub side_by_side: bool,
 }
 
 pub fn layout_for(width: u16) -> Layout2 {
     Layout2 {
         show_size: width >= WIDE_ENOUGH,
-        show_project_pane: width >= TWO_PANE,
+        side_by_side: width >= TWO_PANE,
     }
 }
 
 pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let cfg = layout_for(area.width);
-    if cfg.show_project_pane {
-        let cols = Layout::horizontal([Constraint::Length(26), Constraint::Min(20)]).split(area);
+    if cfg.side_by_side {
+        // 프로젝트 이름 + 배지 + 상태 낱말이 들어갈 만큼은 준다.
+        let pane = if cfg.show_size { 34 } else { 30 };
+        let cols = Layout::horizontal([Constraint::Length(pane), Constraint::Min(24)]).split(area);
         render_projects(frame, app, cols[0]);
         render_sessions(frame, app, cols[1], &cfg);
+    } else if app.focus == Focus::Projects {
+        // 좁은 화면에서는 한 번에 한 패널만. `→` 로 세션 목록으로 넘어간다.
+        render_projects(frame, app, area);
     } else {
         render_sessions(frame, app, area, &cfg);
     }
@@ -36,110 +42,124 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Projects;
-    let items: Vec<ListItem> = app
-        .result
-        .projects
-        .iter()
-        .map(|p| {
-            let open = if app.collapsed.contains(&p.key) {
-                COLLAPSED
-            } else {
-                EXPANDED
-            };
-            let recommended = p
-                .sessions
-                .iter()
-                .filter(|s| app.verdict(&s.id).is_some_and(|v| v.recommended()))
-                .count();
-            // 존재하지 않는 프로젝트는 색이 아니라 낱말로도 표시한다.
-            let mark = match p.exists {
-                Some(false) => " 경로없음",
-                None if p.key != crate::scan::session::ORPHAN_KEY => " 확인불가",
-                _ => "",
-            };
-            let name = theme::fit(&p.short_label(), 14);
-            let line = format!(
-                "{open} {} {}{}",
-                theme::pad(&name, 14),
-                if recommended > 0 {
-                    format!("추천 {recommended}")
-                } else {
-                    "     ".into()
-                },
-                mark
-            );
-            ListItem::new(line)
-        })
-        .collect();
+    let visible = app.visible_projects();
+    // 테두리 2칸 + 커서 기호 2칸을 뺀 나머지가 실제로 글자가 들어갈 폭이다.
+    let inner = area.width.saturating_sub(4) as usize;
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Projects ")
-        .border_style(border_style(focused));
-    frame.render_widget(List::new(items).block(block), area);
-}
-
-fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
-    let inner_width = area.width.saturating_sub(2) as usize;
     let mut items: Vec<ListItem> = Vec::new();
+    for &idx in &visible {
+        let p = &app.result.projects[idx];
+        let recommended = app.recommended_in(p);
+        let selected = app.selected_in(p);
 
-    for row in &app.rows {
-        match row {
-            Row::Project { key } => {
-                if cfg.show_project_pane {
-                    continue;
-                }
-                // 좁은 화면: 프로젝트를 헤더 줄로 끼워 넣는다.
-                let p = app.result.projects.iter().find(|p| &p.key == key);
-                let label = p.map(|p| p.short_label()).unwrap_or_default();
-                items.push(ListItem::new(Line::from(vec![Span::styled(
-                    format!("── {label} "),
-                    Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
-                )])));
-            }
-            Row::Session { id, .. } => {
-                items.push(session_item(app, id, inner_width, cfg));
-            }
-        }
+        // 상태는 색이 아니라 낱말로도 구분된다.
+        let note = match p.exists {
+            Some(false) => "경로없음",
+            None if p.key != crate::scan::session::ORPHAN_KEY => "확인불가",
+            _ => "",
+        };
+        let badge = if selected > 0 {
+            format!("선택 {selected}")
+        } else if recommended > 0 {
+            format!("추천 {recommended}")
+        } else {
+            String::new()
+        };
+
+        // 상태 낱말("경로없음")이 잘리면 색 없이 상태를 구분할 수 없게 되므로
+        // 이름을 먼저 줄이고 배지와 상태 낱말의 자리는 고정한다.
+        const BADGE_W: usize = 7;
+        const NOTE_W: usize = 8;
+        const GUTTER: usize = 1;
+        let name_w = inner.saturating_sub(BADGE_W + NOTE_W + GUTTER).max(6);
+        let line = Line::from(vec![
+            // 여백은 이름 밖에 둔다 — 안에 두면 이름이 꽉 찼을 때 배지와 붙는다.
+            Span::raw(theme::pad(&p.short_label(), name_w)),
+            Span::raw(" ".repeat(GUTTER)),
+            Span::styled(
+                theme::pad(&badge, BADGE_W),
+                Style::default().fg(if selected > 0 { OK } else { RECOMMEND }),
+            ),
+            Span::styled(note.to_string(), Style::default().fg(MUTED)),
+        ]);
+        items.push(ListItem::new(line));
     }
 
     if items.is_empty() {
-        items.push(ListItem::new(empty_message(app)));
+        items.push(ListItem::new("  프로젝트 없음"));
     }
 
-    let title = if app.search.is_empty() {
-        " Sessions ".to_string()
-    } else {
-        format!(" Sessions — 검색: {} ", app.search)
-    };
+    let title = format!(
+        " Projects {}/{} ",
+        (app.project_cursor + 1).min(visible.len().max(1)),
+        visible.len()
+    );
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
-        .title_top(Line::from(format!(" Trash: {} ", app.trash_total_sessions())).right_aligned())
-        .border_style(border_style(app.focus == Focus::Sessions));
+        .border_style(border_style(focused));
 
     let mut state = ListState::default();
-    // 프로젝트 행이 빠질 수 있으므로 커서를 항목 인덱스로 환산한다.
-    state.select(Some(visible_index(app, cfg)));
+    state.select(Some(app.project_cursor.min(items.len().saturating_sub(1))));
     frame.render_stateful_widget(
         List::new(items)
             .block(block)
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED)),
+            .highlight_symbol(if focused { "▶ " } else { "  " })
+            .highlight_style(if focused {
+                Style::default().add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default().add_modifier(Modifier::BOLD)
+            }),
         area,
         &mut state,
     );
 }
 
-fn visible_index(app: &App, cfg: &Layout2) -> usize {
-    if !cfg.show_project_pane {
-        return app.cursor;
-    }
-    app.rows
+fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
+    let focused = app.focus == Focus::Sessions;
+    let sessions = app.visible_sessions();
+    let inner_width = area.width.saturating_sub(4) as usize;
+
+    let mut items: Vec<ListItem> = sessions
         .iter()
-        .take(app.cursor + 1)
-        .filter(|r| r.session_id().is_some())
-        .count()
-        .saturating_sub(1)
+        .map(|s| session_item(app, &s.id, inner_width, cfg))
+        .collect();
+
+    if items.is_empty() {
+        items.push(ListItem::new(empty_message(app)));
+    }
+
+    // 어느 프로젝트를 보고 있는지 항상 제목에 밝힌다.
+    let project = app
+        .current_project()
+        .map(|p| p.short_label())
+        .unwrap_or_else(|| "—".into());
+    let title = if app.search.is_empty() {
+        format!(" {project} — 세션 {} ", sessions.len())
+    } else {
+        format!(" {project} — 검색 '{}' · {} ", app.search, sessions.len())
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(theme::fit(&title, area.width.saturating_sub(14) as usize))
+        .title_top(Line::from(format!(" Trash: {} ", app.trash_total_sessions())).right_aligned())
+        .border_style(border_style(focused));
+
+    let mut state = ListState::default();
+    state.select(Some(app.session_cursor.min(items.len().saturating_sub(1))));
+    frame.render_stateful_widget(
+        List::new(items)
+            .block(block)
+            .highlight_symbol(if focused { "▶ " } else { "  " })
+            .highlight_style(if focused {
+                Style::default().add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default()
+            }),
+        area,
+        &mut state,
+    );
 }
 
 fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> ListItem<'a> {
@@ -175,7 +195,7 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
     };
 
     // 이름과 이유가 나눠 쓸 수 있는 폭.
-    let fixed = 4 + 2 + 8 + 1 + size.len() + 1;
+    let fixed = 4 + 2 + 9 + size.len();
     let rest = width.saturating_sub(fixed).max(20);
     let name_w = (rest * 2 / 5).max(12);
     let reason_w = rest.saturating_sub(name_w);
@@ -205,7 +225,7 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
 
 fn empty_message(app: &App) -> Text<'static> {
     if !app.search.is_empty() {
-        return Text::from(format!("  '{}' 와(과) 맞는 항목이 없습니다", app.search));
+        return Text::from(format!("  '{}' 와(과) 맞는 세션이 없습니다", app.search));
     }
     if !app.paths.claude_dir_exists() {
         return Text::from(vec![
@@ -251,13 +271,31 @@ pub fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         rows[0],
     );
 
+    // 지금 어느 패널에 있는지에 따라 안내가 달라진다.
+    // 잘린 안내는 안내가 아니다. 넓은 문구부터 실제로 들어가는지 재보고
+    // 들어가는 것 중 가장 자세한 것을 쓴다. 마지막 것은 최소 폭(50)에서도 들어간다.
     let keys = if app.searching {
-        " 입력: 검색  Enter 확정  Esc 취소"
+        " 입력: 검색   Enter 확정   Esc 취소"
     } else {
-        " Space 선택  A 추천 전체  D 정리  T 휴지통  F 기준  / 검색  ? 도움말  Q 종료"
+        let full = match app.focus {
+            Focus::Projects => {
+                " ↑↓ 프로젝트  → 세션 보기  Space 전체선택  A 추천전체  D 정리  T 휴지통  F 기준  / 검색  ? 도움말  Q 종료"
+            }
+            Focus::Sessions => {
+                " ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  / 검색  ? 도움말  Q 종료"
+            }
+        };
+        [
+            full,
+            " ↑↓ 이동  ←→ 패널  Space 선택  A 추천  D 정리  T 휴지통  ? 도움말  Q 종료",
+            " ↑↓←→ 이동  Space 선택  A 추천  D 정리  ? 도움말",
+        ]
+        .into_iter()
+        .find(|k| theme::display_width(k) <= area.width as usize)
+        .unwrap_or(" ? 도움말  Q 종료")
     };
     frame.render_widget(
-        Paragraph::new(keys).style(Style::default().fg(MUTED)),
+        Paragraph::new(theme::fit(keys, area.width as usize)).style(Style::default().fg(MUTED)),
         rows[1],
     );
 }
@@ -269,14 +307,14 @@ mod tests {
     #[test]
     fn narrow_terminals_drop_columns_in_order() {
         assert!(layout_for(120).show_size);
-        assert!(layout_for(120).show_project_pane);
+        assert!(layout_for(120).side_by_side);
 
         let medium = layout_for(80);
         assert!(!medium.show_size, "크기 열이 먼저 접힌다");
-        assert!(medium.show_project_pane);
+        assert!(medium.side_by_side, "두 패널은 아직 나란히");
 
         let narrow = layout_for(60);
         assert!(!narrow.show_size);
-        assert!(!narrow.show_project_pane, "그다음 프로젝트 패널이 접힌다");
+        assert!(!narrow.side_by_side, "그다음 한 번에 한 패널만 보여준다");
     }
 }

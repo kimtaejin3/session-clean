@@ -6,7 +6,7 @@ mod support;
 use sclean::ops::manifest::{CleanupMode, OpStatus};
 use sclean::ops::trash;
 use sclean::scan::{ScanEvent, scan};
-use sclean::ui::app::{App, DELETE_WORD, Row, Screen};
+use sclean::ui::app::{App, DELETE_WORD, Focus, Screen};
 use support::{Fixture, uuid};
 
 /// 스캔까지 마친 App을 만든다.
@@ -82,28 +82,81 @@ fn search_filters_projects_and_sessions() {
     let f = Fixture::new();
     let (_a, old_b, _c) = seeded(&f);
     let mut app = ready_app(&f);
-    let all_rows = app.rows.len();
+    assert_eq!(app.visible_projects().len(), 2);
 
+    // 세션 이름으로 찾으면 그 세션을 가진 프로젝트만 남는다.
     app.start_search();
     for c in "포트폴리오".chars() {
         app.push_search(c);
     }
-    assert!(app.rows.len() < all_rows);
-    let ids: Vec<&str> = app.rows.iter().filter_map(|r| r.session_id()).collect();
+    assert_eq!(app.visible_projects().len(), 1);
+    let ids: Vec<&str> = app
+        .visible_sessions()
+        .iter()
+        .map(|s| s.id.as_str())
+        .collect();
     assert_eq!(ids, vec![old_b.as_str()], "세션 이름으로 찾는다");
 
     app.clear_search();
-    assert_eq!(app.rows.len(), all_rows);
+    assert_eq!(app.visible_projects().len(), 2);
 
-    // 프로젝트 이름으로도 찾는다.
+    // 프로젝트 이름으로 찾으면 그 안의 세션이 모두 보인다.
     app.start_search();
     for c in "shop-api".chars() {
         app.push_search(c);
     }
-    assert_eq!(
-        app.rows.iter().filter(|r| r.session_id().is_some()).count(),
-        2
+    assert_eq!(app.visible_projects().len(), 1);
+    assert_eq!(app.visible_sessions().len(), 2);
+}
+
+#[test]
+fn choosing_a_project_shows_only_that_projects_sessions() {
+    let f = Fixture::new();
+    let (old_a, old_b, fresh) = seeded(&f);
+    let mut app = ready_app(&f);
+
+    // 프로젝트는 이름순: portfolio, shop-api
+    app.project_cursor = 0;
+    let first: Vec<&str> = app
+        .visible_sessions()
+        .iter()
+        .map(|s| s.id.as_str())
+        .collect();
+    assert_eq!(first, vec![old_b.as_str()], "portfolio 세션만 보인다");
+
+    app.move_cursor(1);
+    let second: Vec<String> = app
+        .visible_sessions()
+        .iter()
+        .map(|s| s.id.clone())
+        .collect();
+    assert_eq!(second.len(), 2, "shop-api 세션만 보인다");
+    assert!(second.contains(&old_a));
+    assert!(second.contains(&fresh));
+    assert!(
+        !second.contains(&old_b),
+        "다른 프로젝트 세션이 섞이면 안 된다"
     );
+}
+
+#[test]
+fn switching_projects_resets_the_session_cursor() {
+    let f = Fixture::new();
+    seeded(&f);
+    let mut app = ready_app(&f);
+
+    app.project_cursor = 1; // shop-api (세션 2개)
+    app.focus_sessions();
+    app.move_cursor(1);
+    assert_eq!(app.session_cursor, 1);
+
+    app.focus_projects();
+    app.move_cursor(-1); // portfolio (세션 1개)
+    assert_eq!(
+        app.session_cursor, 0,
+        "프로젝트를 바꾸면 세션 커서가 목록 밖을 가리키면 안 된다"
+    );
+    assert!(app.current_session().is_some());
 }
 
 #[test]
@@ -138,16 +191,12 @@ fn blocked_sessions_cannot_be_selected() {
 }
 
 #[test]
-fn project_row_toggles_all_its_sessions() {
+fn space_on_the_project_pane_toggles_all_its_sessions() {
     let f = Fixture::new();
     seeded(&f);
     let mut app = ready_app(&f);
-    let shop_row = app
-        .rows
-        .iter()
-        .position(|r| matches!(r, Row::Project { key } if key.contains("shop-api")))
-        .unwrap();
-    app.cursor = shop_row;
+    app.project_cursor = 1; // shop-api
+    app.focus = Focus::Projects;
     app.toggle_current();
     assert_eq!(app.selected.len(), 2, "shop-api의 두 세션이 모두 선택된다");
     app.toggle_current();
@@ -155,27 +204,63 @@ fn project_row_toggles_all_its_sessions() {
 }
 
 #[test]
-fn collapse_hides_child_rows() {
+fn space_on_the_session_pane_toggles_only_that_session() {
     let f = Fixture::new();
     seeded(&f);
     let mut app = ready_app(&f);
-    let before = app.rows.len();
-    app.cursor = 0;
-    app.collapse_current();
-    assert!(app.rows.len() < before);
-    app.expand_current();
-    assert_eq!(app.rows.len(), before);
+    app.project_cursor = 1;
+    app.focus_sessions();
+    app.toggle_current();
+    assert_eq!(app.selected.len(), 1);
 }
 
 #[test]
-fn cursor_stays_within_bounds() {
+fn arrows_move_focus_between_the_two_panes() {
     let f = Fixture::new();
     seeded(&f);
     let mut app = ready_app(&f);
+    assert_eq!(app.focus, Focus::Projects, "왼쪽에서 시작한다");
+
+    app.focus_sessions();
+    assert_eq!(app.focus, Focus::Sessions);
+    app.focus_projects();
+    assert_eq!(app.focus, Focus::Projects);
+}
+
+#[test]
+fn cursors_stay_within_bounds_in_both_panes() {
+    let f = Fixture::new();
+    seeded(&f);
+    let mut app = ready_app(&f);
+
     app.move_cursor(-5);
-    assert_eq!(app.cursor, 0);
+    assert_eq!(app.project_cursor, 0);
     app.move_cursor(1000);
-    assert_eq!(app.cursor, app.rows.len() - 1);
+    assert_eq!(app.project_cursor, app.visible_projects().len() - 1);
+
+    app.focus_sessions();
+    app.move_cursor(1000);
+    assert_eq!(app.session_cursor, app.visible_sessions().len() - 1);
+    app.move_cursor(-1000);
+    assert_eq!(app.session_cursor, 0);
+}
+
+#[test]
+fn cleanup_leaves_the_cursor_on_a_real_row() {
+    let f = Fixture::new();
+    seeded(&f);
+    let mut app = ready_app(&f);
+    app.project_cursor = app.visible_projects().len() - 1;
+    app.focus_sessions();
+    app.session_cursor = 1;
+
+    app.toggle_all_recommended();
+    app.open_confirm();
+    app.run_cleanup();
+    app.on_scan_event(ScanEvent::Done(Box::new(scan(&f.paths()))));
+
+    assert!(app.project_cursor < app.visible_projects().len().max(1));
+    assert!(app.session_cursor <= app.visible_sessions().len());
 }
 
 #[test]
@@ -424,6 +509,8 @@ fn empty_claude_dir_produces_an_empty_but_working_app() {
     let f = Fixture::bare();
     let app = ready_app(&f);
     assert_eq!(app.result.session_count(), 0);
-    assert!(app.rows.is_empty());
+    assert!(app.visible_projects().is_empty());
+    assert!(app.visible_sessions().is_empty());
+    assert!(app.current_session().is_none());
     assert!(!app.quit);
 }

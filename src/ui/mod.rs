@@ -14,7 +14,7 @@ use crate::logging;
 use crate::ops::manifest::CleanupMode;
 use crate::paths::Paths;
 use crate::scan::{ScanEvent, spawn_scan};
-use app::{App, Focus, Screen};
+use app::{App, Screen};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::{execute, terminal};
 use ratatui::prelude::*;
@@ -167,24 +167,11 @@ fn sessions_key(app: &mut App, key: KeyEvent) {
         KeyCode::Down | KeyCode::Char('j') => app.move_cursor(1),
         KeyCode::PageUp => app.move_cursor(-10),
         KeyCode::PageDown => app.move_cursor(10),
-        KeyCode::Home => app.cursor = 0,
-        KeyCode::End => app.move_cursor(isize::MAX / 2),
-        KeyCode::Left => {
-            if app.focus == Focus::Sessions
-                && matches!(app.current_row(), Some(r) if r.session_id().is_some())
-            {
-                app.focus = Focus::Projects;
-            } else {
-                app.collapse_current();
-            }
-        }
-        KeyCode::Right => {
-            if app.focus == Focus::Projects {
-                app.focus = Focus::Sessions;
-            } else {
-                app.expand_current();
-            }
-        }
+        KeyCode::Home => app.cursor_home(),
+        KeyCode::End => app.cursor_end(),
+        // 왼쪽 프로젝트 목록 <-> 오른쪽 세션 목록.
+        KeyCode::Left | KeyCode::Char('h') => app.focus_projects(),
+        KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => app.focus_sessions(),
         KeyCode::Char(' ') => app.toggle_current(),
         KeyCode::Char('a') | KeyCode::Char('A') => app.toggle_all_recommended(),
         KeyCode::Char('/') => app.start_search(),
