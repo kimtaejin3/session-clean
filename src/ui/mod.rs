@@ -15,9 +15,7 @@ use crate::ops::manifest::CleanupMode;
 use crate::paths::Paths;
 use crate::scan::{ScanEvent, spawn_scan};
 use app::{App, Focus, Screen};
-use ratatui::crossterm::event::{
-    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
-};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::crossterm::{execute, terminal};
 use ratatui::prelude::*;
 use std::io::{Stdout, stdout};
@@ -45,6 +43,9 @@ impl Drop for TerminalGuard {
 
 pub fn run(paths: Paths) -> anyhow::Result<()> {
     logging::init(&paths);
+    if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+        anyhow::bail!("sclean은 터미널에서 직접 실행해야 합니다 (표준 출력이 터미널이 아닙니다)");
+    }
     let _guard = TerminalGuard::enter()?;
     let backend = CrosstermBackend::new(stdout());
     let mut terminal: Terminal<CrosstermBackend<Stdout>> = Terminal::new(backend)?;
@@ -139,11 +140,10 @@ pub fn handle_key(app: &mut App, key: KeyEvent) {
         Screen::Confirm => confirm_key(app, key),
         Screen::Result => result_key(app, key),
         Screen::Trash => trash_key(app, key),
-        Screen::TrashDetail => {
-            if matches!(key.code, KeyCode::Esc | KeyCode::Enter) {
-                app.screen = Screen::Trash;
-            }
+        Screen::TrashDetail if matches!(key.code, KeyCode::Esc | KeyCode::Enter) => {
+            app.screen = Screen::Trash
         }
+        Screen::TrashDetail => {}
         Screen::Filters => filters_key(app, key),
         Screen::Help => {
             if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Enter) {
@@ -170,7 +170,8 @@ fn sessions_key(app: &mut App, key: KeyEvent) {
         KeyCode::Home => app.cursor = 0,
         KeyCode::End => app.move_cursor(isize::MAX / 2),
         KeyCode::Left => {
-            if app.focus == Focus::Sessions && matches!(app.current_row(), Some(r) if r.session_id().is_some())
+            if app.focus == Focus::Sessions
+                && matches!(app.current_row(), Some(r) if r.session_id().is_some())
             {
                 app.focus = Focus::Projects;
             } else {
@@ -197,35 +198,37 @@ fn sessions_key(app: &mut App, key: KeyEvent) {
             app.previous_screen = Screen::Sessions;
             app.screen = Screen::Help;
         }
-        KeyCode::Esc => {
-            if !app.search.is_empty() {
-                app.clear_search();
-            }
-        }
+        KeyCode::Esc if !app.search.is_empty() => app.clear_search(),
         _ => {}
     }
 }
 
 fn confirm_key(app: &mut App, key: KeyEvent) {
+    // 완전 삭제 모드에서는 모든 글자가 확인 낱말 입력이다.
+    // 낱말에 들어 있는 T·E 같은 글자를 단축키로 가로채면 사용자가 DELETE를
+    // 끝까지 칠 수 없고, 최악의 경우 의도와 다른 방식으로 실행된다.
+    let typing = app.confirm.mode == CleanupMode::Permanent;
     match key.code {
         KeyCode::Esc => {
             app.screen = Screen::Sessions;
             app.status = "정리를 취소했습니다".into();
         }
-        KeyCode::Char('t') | KeyCode::Char('T') if app.confirm.mode == CleanupMode::Permanent => {
-            app.set_mode(CleanupMode::Trash)
-        }
-        KeyCode::Char('p') | KeyCode::Char('P') if app.confirm.mode == CleanupMode::Trash => {
-            app.set_mode(CleanupMode::Permanent)
-        }
         KeyCode::Enter => app.run_cleanup(),
-        KeyCode::Backspace => {
+        // 방식 전환은 글자가 아닌 키로만 한다.
+        KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
+            let next = match app.confirm.mode {
+                CleanupMode::Trash => CleanupMode::Permanent,
+                CleanupMode::Permanent => CleanupMode::Trash,
+            };
+            app.set_mode(next);
+        }
+        KeyCode::Backspace if typing => {
             app.confirm.typed.pop();
         }
-        // 완전 삭제 확인 낱말 입력.
-        KeyCode::Char(c) if app.confirm.mode == CleanupMode::Permanent => {
-            app.confirm.typed.push(c);
-        }
+        KeyCode::Char(c) if typing => app.confirm.typed.push(c),
+        // 휴지통 모드에서만 글자 단축키를 받는다.
+        KeyCode::Char('p') | KeyCode::Char('P') => app.set_mode(CleanupMode::Permanent),
+        KeyCode::Char('t') | KeyCode::Char('T') => app.set_mode(CleanupMode::Trash),
         _ => {}
     }
 }
@@ -267,14 +270,14 @@ fn filters_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc | KeyCode::Char('f') | KeyCode::Char('F') => app.screen = Screen::Sessions,
         KeyCode::Char('q') | KeyCode::Char('Q') => app.quit = true,
-        KeyCode::Up | KeyCode::Char('k') => {
-            app.filter_cursor = app.filter_cursor.saturating_sub(1)
-        }
+        KeyCode::Up | KeyCode::Char('k') => app.filter_cursor = app.filter_cursor.saturating_sub(1),
         KeyCode::Down | KeyCode::Char('j') => {
             app.filter_cursor = (app.filter_cursor + 1).min(App::FILTER_ROWS - 1)
         }
         KeyCode::Char(' ') | KeyCode::Enter => app.toggle_filter_row(),
-        KeyCode::Left if app.filter_cursor == 0 => app.adjust_threshold(if shift { -7 } else { -1 }),
+        KeyCode::Left if app.filter_cursor == 0 => {
+            app.adjust_threshold(if shift { -7 } else { -1 })
+        }
         KeyCode::Right if app.filter_cursor == 0 => app.adjust_threshold(if shift { 7 } else { 1 }),
         KeyCode::Char('?') => {
             app.previous_screen = Screen::Filters;

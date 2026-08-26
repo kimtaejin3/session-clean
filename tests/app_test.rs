@@ -100,7 +100,10 @@ fn search_filters_projects_and_sessions() {
     for c in "shop-api".chars() {
         app.push_search(c);
     }
-    assert_eq!(app.rows.iter().filter(|r| r.session_id().is_some()).count(), 2);
+    assert_eq!(
+        app.rows.iter().filter(|r| r.session_id().is_some()).count(),
+        2
+    );
 }
 
 #[test]
@@ -313,7 +316,11 @@ fn trash_screen_can_purge_permanently() {
     app.purge_selection();
     assert!(app.trash_ops.is_empty());
     assert!(app.status.contains("영구 삭제"));
-    assert_eq!(scan(&f.paths()).session_count(), 1, "삭제된 세션은 돌아오지 않는다");
+    assert_eq!(
+        scan(&f.paths()).session_count(),
+        1,
+        "삭제된 세션은 돌아오지 않는다"
+    );
 }
 
 #[test]
@@ -371,7 +378,10 @@ fn recovery_screen_takes_priority_at_startup() {
     let dir = sclean::ops::manifest::Manifest::op_dir(&paths, &op_id);
     let mut m = sclean::ops::manifest::Manifest::new(op_id.clone(), CleanupMode::Trash);
     let key = support::encode_key(f.source_tree("shop-api").to_str().unwrap());
-    let original = paths.projects_dir().join(key).join(format!("{}.jsonl", ids.0));
+    let original = paths
+        .projects_dir()
+        .join(key)
+        .join(format!("{}.jsonl", ids.0));
     let size = std::fs::metadata(&original).unwrap().len();
     sclean::ops::fsutil::move_path(&original, &dir.join("files/0/0-t.jsonl")).unwrap();
     m.sessions.push(sclean::ops::manifest::ManifestSession {

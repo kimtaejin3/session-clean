@@ -51,7 +51,10 @@ fn two_sessions(f: &Fixture) -> Vec<String> {
 
 fn transcript_path(f: &Fixture, id: &str) -> PathBuf {
     let key = support::encode_key(f.source_tree("shop-api").to_str().unwrap());
-    f.paths().projects_dir().join(key).join(format!("{id}.jsonl"))
+    f.paths()
+        .projects_dir()
+        .join(key)
+        .join(format!("{id}.jsonl"))
 }
 
 /// 파일 두 개를 옮긴 뒤 프로세스가 죽은 상황을 만든다.
@@ -96,25 +99,30 @@ fn detects_pending_manifest_from_an_interrupted_run() {
     let size = std::fs::metadata(&original).unwrap().len();
     sclean::ops::fsutil::move_path(&original, &op_dir.join(&stored_rel)).unwrap();
 
-    manifest.sessions.push(sclean::ops::manifest::ManifestSession {
-        session_id: ids[0].clone(),
-        project_key: "shop".into(),
-        project_path: None,
-        display_name: "첫 세션".into(),
-        reasons: vec!["마지막 활동 후 92일 경과".into()],
-        files: vec![sclean::ops::manifest::ManifestFile {
-            original: original.to_string_lossy().into_owned(),
-            stored: stored_rel,
-            size,
-            is_dir: false,
-            moved_at: "2026-08-26T10:10:10+09:00".into(),
-        }],
-        shared: vec![],
-    });
+    manifest
+        .sessions
+        .push(sclean::ops::manifest::ManifestSession {
+            session_id: ids[0].clone(),
+            project_key: "shop".into(),
+            project_path: None,
+            display_name: "첫 세션".into(),
+            reasons: vec!["마지막 활동 후 92일 경과".into()],
+            files: vec![sclean::ops::manifest::ManifestFile {
+                original: original.to_string_lossy().into_owned(),
+                stored: stored_rel,
+                size,
+                is_dir: false,
+                moved_at: "2026-08-26T10:10:10+09:00".into(),
+            }],
+            shared: vec![],
+        });
     manifest.save(&op_dir).unwrap();
 
     // 감지: 휴지통 목록에는 안 보이고, 복구 목록에는 보인다.
-    assert!(trash::list(&paths).is_empty(), "미완료 작업은 휴지통이 아니다");
+    assert!(
+        trash::list(&paths).is_empty(),
+        "미완료 작업은 휴지통이 아니다"
+    );
     let pending = trash::incomplete(&paths);
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].manifest.status, OpStatus::Pending);
@@ -140,21 +148,23 @@ fn recover_twice_is_idempotent() {
     let original = transcript_path(&f, &ids[0]);
     let size = std::fs::metadata(&original).unwrap().len();
     sclean::ops::fsutil::move_path(&original, &op_dir.join("files/0/0-t.jsonl")).unwrap();
-    manifest.sessions.push(sclean::ops::manifest::ManifestSession {
-        session_id: ids[0].clone(),
-        project_key: "shop".into(),
-        project_path: None,
-        display_name: "첫 세션".into(),
-        reasons: vec![],
-        files: vec![sclean::ops::manifest::ManifestFile {
-            original: original.to_string_lossy().into_owned(),
-            stored: "files/0/0-t.jsonl".into(),
-            size,
-            is_dir: false,
-            moved_at: "2026-08-26T10:10:10+09:00".into(),
-        }],
-        shared: vec![],
-    });
+    manifest
+        .sessions
+        .push(sclean::ops::manifest::ManifestSession {
+            session_id: ids[0].clone(),
+            project_key: "shop".into(),
+            project_path: None,
+            display_name: "첫 세션".into(),
+            reasons: vec![],
+            files: vec![sclean::ops::manifest::ManifestFile {
+                original: original.to_string_lossy().into_owned(),
+                stored: "files/0/0-t.jsonl".into(),
+                size,
+                is_dir: false,
+                moved_at: "2026-08-26T10:10:10+09:00".into(),
+            }],
+            shared: vec![],
+        });
     manifest.save(&op_dir).unwrap();
 
     trash::recover(&paths, &op_id).unwrap();
@@ -185,21 +195,23 @@ fn recovery_does_not_overwrite_a_file_that_reappeared() {
     let original = transcript_path(&f, &ids[0]);
     let size = std::fs::metadata(&original).unwrap().len();
     sclean::ops::fsutil::move_path(&original, &op_dir.join("files/0/0-t.jsonl")).unwrap();
-    manifest.sessions.push(sclean::ops::manifest::ManifestSession {
-        session_id: ids[0].clone(),
-        project_key: "shop".into(),
-        project_path: None,
-        display_name: "첫 세션".into(),
-        reasons: vec![],
-        files: vec![sclean::ops::manifest::ManifestFile {
-            original: original.to_string_lossy().into_owned(),
-            stored: "files/0/0-t.jsonl".into(),
-            size,
-            is_dir: false,
-            moved_at: "2026-08-26T10:10:10+09:00".into(),
-        }],
-        shared: vec![],
-    });
+    manifest
+        .sessions
+        .push(sclean::ops::manifest::ManifestSession {
+            session_id: ids[0].clone(),
+            project_key: "shop".into(),
+            project_path: None,
+            display_name: "첫 세션".into(),
+            reasons: vec![],
+            files: vec![sclean::ops::manifest::ManifestFile {
+                original: original.to_string_lossy().into_owned(),
+                stored: "files/0/0-t.jsonl".into(),
+                size,
+                is_dir: false,
+                moved_at: "2026-08-26T10:10:10+09:00".into(),
+            }],
+            shared: vec![],
+        });
     manifest.save(&op_dir).unwrap();
 
     // Claude Code가 같은 이름으로 새 세션을 만들었다.

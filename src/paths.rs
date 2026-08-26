@@ -32,8 +32,8 @@ impl Paths {
     ///
     /// `SCLEAN_CLAUDE_DIR` / `SCLEAN_DATA_DIR`는 수동 검증과 fixture 실행에 쓴다.
     pub fn discover() -> anyhow::Result<Paths> {
-        let home = dirs::home_dir()
-            .ok_or_else(|| anyhow::anyhow!("홈 디렉터리를 찾지 못했습니다"))?;
+        let home =
+            dirs::home_dir().ok_or_else(|| anyhow::anyhow!("홈 디렉터리를 찾지 못했습니다"))?;
         let claude_dir = match std::env::var_os("SCLEAN_CLAUDE_DIR") {
             Some(v) => PathBuf::from(v),
             None => home.join(".claude"),

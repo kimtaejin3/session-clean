@@ -130,7 +130,10 @@ pub fn ensure_within(root: &Path, target: &Path) -> Result<()> {
     let full = parent_c.join(name);
 
     if full == root_c {
-        bail!("데이터 루트 자체는 대상이 될 수 없습니다: {}", full.display());
+        bail!(
+            "데이터 루트 자체는 대상이 될 수 없습니다: {}",
+            full.display()
+        );
     }
     if !full.starts_with(&root_c) {
         bail!(

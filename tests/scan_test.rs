@@ -35,7 +35,9 @@ fn groups_sessions_by_project() {
     assert_eq!(shop.exists, Some(true));
     assert_eq!(shop.path.as_deref(), Some(a.as_path()));
     assert!(
-        shop.sessions.iter().any(|s| s.display_name == "로그인 수정"),
+        shop.sessions
+            .iter()
+            .any(|s| s.display_name == "로그인 수정"),
         "summary를 표시 이름으로 쓴다"
     );
 }
@@ -59,7 +61,9 @@ fn corrupted_session_is_listed_but_marked_unanalyzable() {
         .build();
 
     let result = scan(&f.paths());
-    let s = result.find(&support::encode_key(p.to_str().unwrap()), &id).unwrap();
+    let s = result
+        .find(&support::encode_key(p.to_str().unwrap()), &id)
+        .unwrap();
     assert!(matches!(s.analysis, Analysis::Unreadable(_)));
     assert!(
         s.display_name.starts_with("분석 불가"),
@@ -79,7 +83,9 @@ fn partially_broken_session_keeps_readable_information() {
         .build();
 
     let result = scan(&f.paths());
-    let s = result.find(&support::encode_key(p.to_str().unwrap()), &id).unwrap();
+    let s = result
+        .find(&support::encode_key(p.to_str().unwrap()), &id)
+        .unwrap();
     assert!(matches!(s.analysis, Analysis::Partial(_)));
     assert_eq!(s.display_name, "읽히는 질문");
 }
@@ -118,7 +124,10 @@ fn project_without_cwd_is_never_judged_as_missing() {
 fn subagent_sessions_are_marked() {
     let f = Fixture::new();
     let p = f.source_tree("agents");
-    let parent = f.session(p.to_str().unwrap(), &uuid(11)).user("부모").build();
+    let parent = f
+        .session(p.to_str().unwrap(), &uuid(11))
+        .user("부모")
+        .build();
     f.session(p.to_str().unwrap(), &uuid(12))
         .subagent_of(&parent)
         .user("하위 작업")
@@ -134,7 +143,9 @@ fn subagent_sessions_are_marked() {
 fn orphan_artifacts_appear_as_orphan_sessions() {
     let f = Fixture::new();
     let p = f.source_tree("live");
-    f.session(p.to_str().unwrap(), &uuid(20)).user("살아있음").build();
+    f.session(p.to_str().unwrap(), &uuid(20))
+        .user("살아있음")
+        .build();
     f.orphan_env(&uuid(99));
     f.orphan_task("deadbeef");
 
@@ -147,7 +158,12 @@ fn orphan_artifacts_appear_as_orphan_sessions() {
     let ids: Vec<&str> = orphans.sessions.iter().map(|s| s.id.as_str()).collect();
     assert!(ids.contains(&uuid(99).as_str()));
     assert!(ids.contains(&"session-deadbeef"));
-    assert!(orphans.sessions.iter().all(|s| s.kind == SessionKind::Orphan));
+    assert!(
+        orphans
+            .sessions
+            .iter()
+            .all(|s| s.kind == SessionKind::Orphan)
+    );
     assert_eq!(
         orphans.short_label(),
         "고아 데이터",
@@ -168,8 +184,14 @@ fn artifacts_are_attached_and_sizes_summed() {
         .build();
 
     let result = scan(&f.paths());
-    let s = result.find(&support::encode_key(p.to_str().unwrap()), &id).unwrap();
-    assert!(s.file_count() >= 4, "기록 + 연결 데이터: {}", s.file_count());
+    let s = result
+        .find(&support::encode_key(p.to_str().unwrap()), &id)
+        .unwrap();
+    assert!(
+        s.file_count() >= 4,
+        "기록 + 연결 데이터: {}",
+        s.file_count()
+    );
     assert!(s.size_bytes > 0);
     assert!(!s.ambiguous_ownership);
 }
@@ -178,8 +200,13 @@ fn artifacts_are_attached_and_sizes_summed() {
 fn sessions_sorted_by_recency_within_project() {
     let f = Fixture::new();
     let p = f.source_tree("sorted");
-    f.session(p.to_str().unwrap(), &uuid(41)).user("오래된").age_days(90).build();
-    f.session(p.to_str().unwrap(), &uuid(42)).user("최근").build();
+    f.session(p.to_str().unwrap(), &uuid(41))
+        .user("오래된")
+        .age_days(90)
+        .build();
+    f.session(p.to_str().unwrap(), &uuid(42))
+        .user("최근")
+        .build();
 
     let result = scan(&f.paths());
     let names: Vec<&str> = result.projects[0]

@@ -94,7 +94,10 @@ mod tests {
         assert_eq!(relative_time(1000, 1000), "방금");
         assert_eq!(relative_time(10_000, 10_000 - 120), "2분 전");
         assert_eq!(relative_time(100_000, 100_000 - 7200), "2시간 전");
-        assert_eq!(relative_time(10_000_000, 10_000_000 - 92 * 86_400), "92일 전");
+        assert_eq!(
+            relative_time(10_000_000, 10_000_000 - 92 * 86_400),
+            "92일 전"
+        );
     }
 
     #[test]
@@ -113,9 +116,19 @@ mod tests {
     #[test]
     fn every_state_has_a_symbol_not_only_a_color() {
         // 선택·추천·차단 상태는 색 없이도 구분된다.
-        let symbols = [SEL_ON, SEL_OFF, SEL_BLOCKED, MARK_RECOMMENDED, MARK_UNPARSABLE, MARK_RUNNING];
+        let symbols = [
+            SEL_ON,
+            SEL_OFF,
+            SEL_BLOCKED,
+            MARK_RECOMMENDED,
+            MARK_UNPARSABLE,
+            MARK_RUNNING,
+        ];
         assert_eq!(
-            symbols.iter().collect::<std::collections::HashSet<_>>().len(),
+            symbols
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
             symbols.len()
         );
     }

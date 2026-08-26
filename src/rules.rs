@@ -198,7 +198,8 @@ pub fn evaluate(s: &Session, cfg: &Config, now_secs: i64, live: &LiveSessions) -
         && s.project_exists == Some(false)
         && let Some(path) = &s.project_path
     {
-        v.reasons.push(Reason::MissingProject { path: path.clone() });
+        v.reasons
+            .push(Reason::MissingProject { path: path.clone() });
     }
 
     // R3 짧은 세션 — JSONL을 정상적으로 분석한 경우에만.
@@ -399,7 +400,9 @@ mod tests {
         let paths = crate::Paths::with_roots(tmp.path().join("c"), tmp.path().join("d"));
         std::fs::create_dir_all(paths.sessions_dir()).unwrap();
         std::fs::write(
-            paths.sessions_dir().join(format!("{}.json", std::process::id())),
+            paths
+                .sessions_dir()
+                .join(format!("{}.json", std::process::id())),
             format!(r#"{{"sessionId":"{}"}}"#, s.id),
         )
         .unwrap();

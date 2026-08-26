@@ -43,12 +43,14 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     for (i, (label, on, note)) in toggles.iter().enumerate() {
         let cursor = if app.filter_cursor == i { "▶" } else { " " };
         let mark = if *on { SEL_ON } else { SEL_OFF };
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{cursor} {mark} {label}"),
-                Style::default().fg(if app.filter_cursor == i { ACCENT } else { Color::Reset }),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("{cursor} {mark} {label}"),
+            Style::default().fg(if app.filter_cursor == i {
+                ACCENT
+            } else {
+                Color::Reset
+            }),
+        )]));
         lines.push(Line::styled(
             format!("      {note}"),
             Style::default().fg(MUTED),

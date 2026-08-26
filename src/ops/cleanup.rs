@@ -99,8 +99,7 @@ pub fn preview(targets: &[CleanupTarget], live: &LiveSessions) -> CleanupPreview
     let mut projects = HashSet::new();
     for t in targets {
         if let Some(reason) = skip_reason(t, live) {
-            p.excluded
-                .push((t.session.display_name.clone(), reason));
+            p.excluded.push((t.session.display_name.clone(), reason));
             continue;
         }
         projects.insert(t.session.project_key.clone());
@@ -163,9 +162,7 @@ pub fn execute_with(
     let mut ready: Vec<&CleanupTarget> = Vec::new();
     for t in &targets {
         match skip_reason(t, live) {
-            Some(r) => outcome
-                .skipped
-                .push((t.session.display_name.clone(), r)),
+            Some(r) => outcome.skipped.push((t.session.display_name.clone(), r)),
             None => ready.push(t),
         }
     }
@@ -279,7 +276,12 @@ pub fn execute_with(
     // --- 실패 시 롤백 (FR-14) ---
     if let Some(msg) = failure {
         logging::error(&format!("cleanup failed op={op_id}: {msg}"));
-        let recovered = rollback(&mut manifest, &moved, backup.as_deref(), &paths.history_file());
+        let recovered = rollback(
+            &mut manifest,
+            &moved,
+            backup.as_deref(),
+            &paths.history_file(),
+        );
         manifest.status = if recovered {
             OpStatus::RolledBack
         } else {

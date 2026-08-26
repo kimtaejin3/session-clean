@@ -51,7 +51,10 @@ pub fn spawn_scan(paths: Paths) -> Receiver<ScanEvent> {
     rx
 }
 
-pub fn scan_with_progress(paths: &Paths, on_progress: &(dyn Fn(usize, usize) + Sync)) -> ScanResult {
+pub fn scan_with_progress(
+    paths: &Paths,
+    on_progress: &(dyn Fn(usize, usize) + Sync),
+) -> ScanResult {
     let now = now_secs();
     let mut errors = Vec::new();
 
@@ -285,13 +288,14 @@ fn group(sessions: Vec<Session>) -> Vec<Project> {
     for p in &mut projects {
         // 최근 활동 순 — 오래된 것을 아래로 모아 훑기 쉽게 한다.
         p.sessions
-            .sort_by(|a, b| b.last_active_secs.cmp(&a.last_active_secs));
+            .sort_by_key(|s| std::cmp::Reverse(s.last_active_secs));
     }
     // 고아 데이터는 항상 마지막, 나머지는 이름순.
     projects.sort_by(|a, b| {
         let ao = (a.key == ORPHAN_KEY) as u8;
         let bo = (b.key == ORPHAN_KEY) as u8;
-        ao.cmp(&bo).then_with(|| a.short_label().cmp(&b.short_label()))
+        ao.cmp(&bo)
+            .then_with(|| a.short_label().cmp(&b.short_label()))
     });
     projects
 }

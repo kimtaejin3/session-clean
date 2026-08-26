@@ -11,9 +11,9 @@ use crate::ops::manifest::CleanupMode;
 use crate::ops::trash::{self, RestoreOutcome, TrashOp};
 use crate::paths::Paths;
 use crate::rules::{Verdict, evaluate};
-use crate::scan::session::ORPHAN_KEY;
 use crate::scan::ScanEvent;
 use crate::scan::now_secs;
+use crate::scan::session::ORPHAN_KEY;
 use crate::scan::session::ScanResult;
 use std::collections::{HashMap, HashSet};
 
@@ -65,12 +65,6 @@ pub struct ConfirmState {
     pub preview: CleanupPreview,
     pub mode: CleanupMode,
     pub typed: String,
-}
-
-impl Default for CleanupMode {
-    fn default() -> Self {
-        CleanupMode::Trash
-    }
 }
 
 impl ConfirmState {
@@ -223,9 +217,9 @@ impl App {
         let needle = self.search.to_lowercase();
         let mut rows = Vec::new();
         for project in &self.result.projects {
-            let project_hit =
-                needle.is_empty() || project.label.to_lowercase().contains(&needle)
-                    || project.short_label().to_lowercase().contains(&needle);
+            let project_hit = needle.is_empty()
+                || project.label.to_lowercase().contains(&needle)
+                || project.short_label().to_lowercase().contains(&needle);
             let matching: Vec<&crate::scan::session::Session> = project
                 .sessions
                 .iter()
@@ -601,7 +595,8 @@ impl App {
     pub const FILTER_ROWS: usize = 5;
 
     pub fn adjust_threshold(&mut self, delta: i64) {
-        let next = (self.config.old_days as i64 + delta).clamp(MIN_OLD_DAYS as i64, MAX_OLD_DAYS as i64);
+        let next =
+            (self.config.old_days as i64 + delta).clamp(MIN_OLD_DAYS as i64, MAX_OLD_DAYS as i64);
         self.config.old_days = next as u64;
         self.persist_config();
     }

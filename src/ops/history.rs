@@ -79,10 +79,8 @@ pub fn apply(history: &Path, plan: &HistoryPlan, op_id: &str) -> Result<Option<P
     if plan.is_noop() {
         return Ok(None);
     }
-    let backup = history.with_file_name(format!(
-        "{}.sclean-bak-{op_id}",
-        fsutil_file_name(history)
-    ));
+    let backup =
+        history.with_file_name(format!("{}.sclean-bak-{op_id}", fsutil_file_name(history)));
     std::fs::copy(history, &backup)?;
 
     let mut body = plan.kept.join("\n");
@@ -229,7 +227,11 @@ mod tests {
         let removed = plan.removed.clone();
         apply(&p, &plan, "op1").unwrap();
         assert_eq!(merge_back(&p, &removed).unwrap(), 1);
-        assert!(std::fs::read_to_string(&p).unwrap().contains(r#""sessionId":"a""#));
+        assert!(
+            std::fs::read_to_string(&p)
+                .unwrap()
+                .contains(r#""sessionId":"a""#)
+        );
     }
 
     #[test]

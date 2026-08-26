@@ -75,9 +75,15 @@ fn moves_multiple_sessions_to_trash_with_manifest() {
     assert!(out.bytes > 0);
 
     // 원본이 사라졌다.
-    assert!(!f.paths().projects_dir().join(support::encode_key(
-        f.source_tree("shop-api").to_str().unwrap()
-    )).join(format!("{a}.jsonl")).exists());
+    assert!(
+        !f.paths()
+            .projects_dir()
+            .join(support::encode_key(
+                f.source_tree("shop-api").to_str().unwrap()
+            ))
+            .join(format!("{a}.jsonl"))
+            .exists()
+    );
     assert!(!f.paths().sidecar_dir("session-env").join(&a).exists());
     assert!(!f.paths().sidecar_dir("file-history").join(&b).exists());
 
@@ -107,7 +113,10 @@ fn permanent_delete_removes_the_trash_op_dir() {
     )
     .unwrap();
     assert_eq!(out.succeeded.len(), 2);
-    assert!(trash::list(&f.paths()).is_empty(), "완전 삭제는 흔적을 남기지 않는다");
+    assert!(
+        trash::list(&f.paths()).is_empty(),
+        "완전 삭제는 흔적을 남기지 않는다"
+    );
     assert!(!Manifest::op_dir(&f.paths(), &out.op_id).exists());
 }
 
@@ -149,10 +158,7 @@ fn failure_midway_rolls_back_every_moved_file() {
 
     // 모든 원본이 제자리에 있다 — 부분 정리 상태가 남으면 안 된다.
     for path in &before {
-        assert!(
-            Path::new(path).exists(),
-            "롤백되지 않은 파일: {path}"
-        );
+        assert!(Path::new(path).exists(), "롤백되지 않은 파일: {path}");
     }
     assert!(trash::list(&f.paths()).is_empty());
     assert!(!a.is_empty());
@@ -182,7 +188,10 @@ fn history_replace_failure_rolls_back_whole_operation() {
     set_mode(&root, 0o755);
     let out = out.unwrap();
 
-    assert!(out.rolled_back, "공유 기록 교체 실패는 전체 롤백이다: {out:?}");
+    assert!(
+        out.rolled_back,
+        "공유 기록 교체 실패는 전체 롤백이다: {out:?}"
+    );
     assert!(out.succeeded.is_empty());
     for path in &originals {
         assert!(Path::new(path).exists(), "롤백되지 않음: {path}");
@@ -229,7 +238,11 @@ fn session_changed_after_scan_is_skipped() {
 
     // 스캔 이후 파일이 커진다 (사용자가 세션을 다시 열었다).
     let key = support::encode_key(f.source_tree("shop-api").to_str().unwrap());
-    let path = f.paths().projects_dir().join(&key).join(format!("{a}.jsonl"));
+    let path = f
+        .paths()
+        .projects_dir()
+        .join(&key)
+        .join(format!("{a}.jsonl"));
     let mut content = std::fs::read_to_string(&path).unwrap();
     content.push_str("{\"type\":\"user\",\"message\":{\"content\":\"새 질문\"}}\n");
     std::fs::write(&path, content).unwrap();
@@ -270,7 +283,11 @@ fn running_session_is_skipped_not_deleted() {
     assert_eq!(out.skipped.len(), 1);
     let key = support::encode_key(f.source_tree("shop-api").to_str().unwrap());
     assert!(
-        f.paths().projects_dir().join(key).join(format!("{a}.jsonl")).exists(),
+        f.paths()
+            .projects_dir()
+            .join(key)
+            .join(format!("{a}.jsonl"))
+            .exists(),
         "실행 중 세션은 절대 지우지 않는다"
     );
 }
@@ -310,7 +327,13 @@ fn project_source_tree_is_untouched_by_a_normal_cleanup() {
     let source = f.source_tree("shop-api");
     let before = snapshot(&source);
 
-    execute(&f.paths(), targets(&f), CleanupMode::Trash, &LiveSessions::empty()).unwrap();
+    execute(
+        &f.paths(),
+        targets(&f),
+        CleanupMode::Trash,
+        &LiveSessions::empty(),
+    )
+    .unwrap();
 
     assert_eq!(before, snapshot(&source), "프로젝트 소스 트리가 변경되었다");
 }

@@ -28,9 +28,11 @@ pub enum OpStatus {
     Failed,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CleanupMode {
+    /// 기본값. 되돌릴 수 있는 쪽이 언제나 기본이어야 한다 (PRD §6).
+    #[default]
     Trash,
     Permanent,
 }

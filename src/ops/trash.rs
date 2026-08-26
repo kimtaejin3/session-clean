@@ -11,7 +11,7 @@ use crate::ops::manifest::{Manifest, ManifestSession, OpStatus};
 use crate::ops::{fsutil, history};
 use crate::paths::Paths;
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 pub struct TrashOp {
@@ -82,7 +82,9 @@ pub fn total_bytes(ops: &[TrashOp]) -> u64 {
 
 pub fn find(paths: &Paths, op_id: &str) -> Option<TrashOp> {
     let dir = Manifest::op_dir(paths, op_id);
-    Manifest::load(&dir).ok().map(|manifest| TrashOp { manifest, dir })
+    Manifest::load(&dir)
+        .ok()
+        .map(|manifest| TrashOp { manifest, dir })
 }
 
 /// 선택한 작업(또는 그 안의 일부 세션)을 원래 위치로 되돌린다.
@@ -135,7 +137,7 @@ enum RestoreResult {
 
 fn restore_session(
     paths: &Paths,
-    dir: &PathBuf,
+    dir: &Path,
     session: &ManifestSession,
     outcome: &mut RestoreOutcome,
 ) -> RestoreResult {
@@ -149,9 +151,10 @@ fn restore_session(
             // 이미 되돌렸거나 애초에 옮기지 못한 파일 — 멱등하게 넘어간다.
             if !original.exists() {
                 all_ok = false;
-                outcome
-                    .failed
-                    .push((session.display_name.clone(), format!("{} 없음", file.stored)));
+                outcome.failed.push((
+                    session.display_name.clone(),
+                    format!("{} 없음", file.stored),
+                ));
             }
             continue;
         }
@@ -184,9 +187,10 @@ fn restore_session(
         Ok(n) => outcome.merged_shared += n,
         Err(e) => {
             all_ok = false;
-            outcome
-                .failed
-                .push((session.display_name.clone(), format!("공유 기록 병합 실패: {e}")));
+            outcome.failed.push((
+                session.display_name.clone(),
+                format!("공유 기록 병합 실패: {e}"),
+            ));
         }
     }
 

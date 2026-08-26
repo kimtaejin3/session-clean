@@ -106,7 +106,10 @@ fn r3_short_session_matches_and_a_worked_session_does_not() {
     let cfg = Config::default();
     let v = verdict_for(&f, &cfg, &short);
     assert!(v.recommended());
-    assert!(matches!(v.reasons[0], Reason::ShortSession { user_messages: 1 }));
+    assert!(matches!(
+        v.reasons[0],
+        Reason::ShortSession { user_messages: 1 }
+    ));
     assert!(!verdict_for(&f, &cfg, &worked).recommended());
 }
 
@@ -175,7 +178,11 @@ fn r5_orphan_data_matches() {
     f.orphan_env_aged(&uuid(11), 40);
     let v = verdict_for(&f, &Config::default(), &uuid(11));
     assert!(v.recommended(), "{:?}", v);
-    assert!(v.reasons.iter().any(|r| matches!(r, Reason::OrphanData { .. })));
+    assert!(
+        v.reasons
+            .iter()
+            .any(|r| matches!(r, Reason::OrphanData { .. }))
+    );
     assert!(v.label().contains("대화 기록 없이 남은 데이터"));
 }
 
@@ -210,9 +217,15 @@ fn threshold_change_moves_the_boundary() {
         .build();
 
     let mut cfg = Config::default();
-    assert!(verdict_for(&f, &cfg, &id).recommended(), "30일 기준에서는 추천");
+    assert!(
+        verdict_for(&f, &cfg, &id).recommended(),
+        "30일 기준에서는 추천"
+    );
     cfg.old_days = 60;
-    assert!(!verdict_for(&f, &cfg, &id).recommended(), "60일 기준에서는 제외");
+    assert!(
+        !verdict_for(&f, &cfg, &id).recommended(),
+        "60일 기준에서는 제외"
+    );
 }
 
 #[test]
@@ -256,8 +269,15 @@ fn ambiguous_prefix_blocks_both_sessions() {
     // 앞 8자가 같은 두 세션이 하나의 tasks/ 폴더를 공유한다.
     let a = "abcd1234-1111-2222-3333-444444444444";
     let b = "abcd1234-9999-8888-7777-666666666666";
-    f.session(p.to_str().unwrap(), a).user("q").age_days(90).with_task().build();
-    f.session(p.to_str().unwrap(), b).user("q").age_days(90).build();
+    f.session(p.to_str().unwrap(), a)
+        .user("q")
+        .age_days(90)
+        .with_task()
+        .build();
+    f.session(p.to_str().unwrap(), b)
+        .user("q")
+        .age_days(90)
+        .build();
 
     let cfg = Config::default();
     let v = verdict_for(&f, &cfg, a);

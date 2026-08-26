@@ -12,11 +12,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let mut items: Vec<ListItem> = Vec::new();
 
     for (i, op) in app.trash_ops.iter().enumerate() {
-        let all_selected = op
-            .manifest
-            .sessions
-            .iter()
-            .all(|s| app.trash_selected.contains(&(op.manifest.op_id.clone(), s.session_id.clone())));
+        let all_selected = op.manifest.sessions.iter().all(|s| {
+            app.trash_selected
+                .contains(&(op.manifest.op_id.clone(), s.session_id.clone()))
+        });
         let check = if all_selected && !op.manifest.sessions.is_empty() {
             SEL_ON
         } else {
@@ -63,7 +62,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let total = human_bytes(crate::ops::trash::total_bytes(&app.trash_ops));
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" Trash — 세션 {}개 · {total} ", app.trash_total_sessions()))
+        .title(format!(
+            " Trash — 세션 {}개 · {total} ",
+            app.trash_total_sessions()
+        ))
         .border_style(Style::default().fg(ACCENT));
 
     let mut state = ListState::default();
@@ -105,7 +107,11 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
 
     let mut lines = vec![
         Line::styled(
-            format!("{} · {}", op.manifest.display_time(), op.manifest.mode.label()),
+            format!(
+                "{} · {}",
+                op.manifest.display_time(),
+                op.manifest.mode.label()
+            ),
             Style::default().add_modifier(Modifier::BOLD),
         ),
         Line::from(""),

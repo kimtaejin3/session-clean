@@ -31,7 +31,9 @@ fn modal<'a>(frame: &mut Frame, area: Rect, title: &'a str, lines: Vec<Line<'a>>
         .title(format!(" {title} "))
         .border_style(Style::default().fg(if danger { DANGER } else { ACCENT }));
     frame.render_widget(
-        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false }),
         area,
     );
 }
@@ -42,10 +44,7 @@ pub fn render_confirm(frame: &mut Frame, app: &App, area: Rect) {
     let permanent = app.confirm.mode == CleanupMode::Permanent;
 
     let mut lines = vec![
-        Line::from(format!(
-            "프로젝트 {}개 · 세션 {}개",
-            p.projects, p.sessions
-        )),
+        Line::from(format!("프로젝트 {}개 · 세션 {}개", p.projects, p.sessions)),
         Line::from(format!(
             "이동/삭제할 파일 {}개 · 예상 정리 용량 {}",
             p.files,
@@ -68,18 +67,27 @@ pub fn render_confirm(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(""));
     }
 
-    let trash_mark = if permanent { " " } else { "▶" };
-    let perm_mark = if permanent { "▶" } else { " " };
-    lines.push(Line::from(format!("{trash_mark} [T] 휴지통 이동 — 나중에 복원할 수 있습니다")));
+    let trash_mark = if permanent { "  " } else { "▶ " };
+    let perm_mark = if permanent { "▶ " } else { "  " };
+    lines.push(Line::from(format!(
+        "{trash_mark}휴지통 이동 — 나중에 복원할 수 있습니다"
+    )));
     lines.push(Line::styled(
-        format!("{perm_mark} [P] 완전 삭제 — 되돌릴 수 없습니다"),
+        format!("{perm_mark}완전 삭제 — 되돌릴 수 없습니다"),
         Style::default().fg(DANGER),
+    ));
+    lines.push(Line::styled(
+        "  ← → 로 방식 선택",
+        Style::default().fg(MUTED),
     ));
     lines.push(Line::from(""));
 
     if permanent {
         lines.push(Line::styled(
-            format!("계속하려면 {DELETE_WORD} 를 입력하세요: {}", app.confirm.typed),
+            format!(
+                "계속하려면 {DELETE_WORD} 를 입력하세요: {}",
+                app.confirm.typed
+            ),
             Style::default().fg(DANGER).add_modifier(Modifier::BOLD),
         ));
     }
@@ -97,7 +105,11 @@ pub fn render_confirm(frame: &mut Frame, app: &App, area: Rect) {
     modal(
         frame,
         box_area,
-        if permanent { "완전 삭제 확인" } else { "정리 확인" },
+        if permanent {
+            "완전 삭제 확인"
+        } else {
+            "정리 확인"
+        },
         lines,
         permanent,
     );
@@ -155,10 +167,7 @@ pub fn render_result(frame: &mut Frame, app: &App, area: Rect) {
     ));
     if app.show_log {
         for l in logging::tail(&app.paths, 12) {
-            lines.push(Line::styled(
-                format!("  {l}"),
-                Style::default().fg(MUTED),
-            ));
+            lines.push(Line::styled(format!("  {l}"), Style::default().fg(MUTED)));
         }
     }
     lines.push(Line::from(""));
@@ -174,10 +183,7 @@ fn section(lines: &mut Vec<Line<'static>>, title: &str, color: Color, items: &[S
     if items.is_empty() {
         return;
     }
-    lines.push(Line::styled(
-        title.to_string(),
-        Style::default().fg(color),
-    ));
+    lines.push(Line::styled(title.to_string(), Style::default().fg(color)));
     for name in items.iter().take(8) {
         lines.push(Line::from(format!("  · {name}")));
     }
@@ -209,10 +215,7 @@ pub fn render_recovery(frame: &mut Frame, app: &App, area: Rect) {
         "복구하면 옮겨진 파일을 원래 자리로 되돌립니다. 같은 경로에 파일이 이미 있으면 덮어쓰지 않고 건너뜁니다.",
     ));
     lines.push(Line::from(""));
-    lines.push(Line::styled(
-        "R 복구   Esc 나중에",
-        Style::default().fg(OK),
-    ));
+    lines.push(Line::styled("R 복구   Esc 나중에", Style::default().fg(OK)));
     modal(frame, box_area, "중단된 작업 복구", lines, true);
 }
 
@@ -240,7 +243,10 @@ pub fn render_help(frame: &mut Frame, area: Rect) {
         })
         .collect();
     lines.push(Line::from(""));
-    lines.push(Line::styled("안전 정책", Style::default().add_modifier(Modifier::BOLD)));
+    lines.push(Line::styled(
+        "안전 정책",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
     for note in [
         "시작할 때 아무것도 선택되어 있지 않습니다.",
         "실행 직전 파일이 바뀐 세션은 자동으로 제외합니다.",
@@ -253,7 +259,10 @@ pub fn render_help(frame: &mut Frame, area: Rect) {
         lines.push(Line::from(format!("  · {note}")));
     }
     lines.push(Line::from(""));
-    lines.push(Line::styled("기호", Style::default().add_modifier(Modifier::BOLD)));
+    lines.push(Line::styled(
+        "기호",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
     lines.push(Line::from(format!(
         "  {SEL_ON} 선택   {SEL_OFF} 미선택   {SEL_BLOCKED} 정리 불가"
     )));

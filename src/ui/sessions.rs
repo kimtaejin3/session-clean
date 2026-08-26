@@ -115,13 +115,7 @@ fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
-        .title_top(
-            Line::from(format!(
-                " Trash: {} ",
-                app.trash_total_sessions()
-            ))
-            .right_aligned(),
-        )
+        .title_top(Line::from(format!(" Trash: {} ", app.trash_total_sessions())).right_aligned())
         .border_style(border_style(app.focus == Focus::Sessions));
 
     let mut state = ListState::default();

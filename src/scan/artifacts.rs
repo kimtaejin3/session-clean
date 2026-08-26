@@ -406,7 +406,10 @@ mod tests {
 
         let known: HashSet<String> = [A.to_string()].into_iter().collect();
         let orphans = orphan_session_ids(&paths, &known);
-        assert!(!orphans.contains(&A.to_string()), "알려진 세션은 고아가 아니다");
+        assert!(
+            !orphans.contains(&A.to_string()),
+            "알려진 세션은 고아가 아니다"
+        );
         assert!(orphans.contains(&C.to_string()));
         assert!(orphans.contains(&"session-eeeeeeee".to_string()));
     }

@@ -6,9 +6,9 @@
 
 use crate::paths::Paths;
 use std::io::Write;
-use std::sync::OnceLock;
-use std::sync::Mutex;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 static LOG_PATH: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 

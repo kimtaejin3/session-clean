@@ -58,7 +58,10 @@ fn trashed(f: &Fixture) -> (String, Vec<String>) {
 
 fn transcript_path(f: &Fixture, id: &str) -> std::path::PathBuf {
     let key = support::encode_key(f.source_tree("shop-api").to_str().unwrap());
-    f.paths().projects_dir().join(key).join(format!("{id}.jsonl"))
+    f.paths()
+        .projects_dir()
+        .join(key)
+        .join(format!("{id}.jsonl"))
 }
 
 #[test]
@@ -77,7 +80,10 @@ fn restores_session_files_to_original_paths() {
     assert!(f.paths().sidecar_dir("session-env").join(&ids[0]).exists());
     // 다시 스캔하면 세션이 그대로 보인다.
     assert_eq!(scan(&f.paths()).session_count(), 2);
-    assert!(trash::list(&f.paths()).is_empty(), "빈 작업 폴더는 제거된다");
+    assert!(
+        trash::list(&f.paths()).is_empty(),
+        "빈 작업 폴더는 제거된다"
+    );
 }
 
 #[test]
@@ -207,7 +213,10 @@ fn purge_removes_only_the_selected_sessions() {
     let r = trash::restore(&f.paths(), &op, None).unwrap();
     assert!(r.is_clean());
     assert!(transcript_path(&f, &ids[1]).exists());
-    assert!(!transcript_path(&f, &ids[0]).exists(), "영구 삭제된 것은 돌아오지 않는다");
+    assert!(
+        !transcript_path(&f, &ids[0]).exists(),
+        "영구 삭제된 것은 돌아오지 않는다"
+    );
 }
 
 #[test]

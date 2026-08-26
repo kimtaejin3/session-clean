@@ -86,9 +86,11 @@ mod tests {
     fn round_trips_and_recovers_from_corruption() {
         let tmp = tempfile::tempdir().unwrap();
         let p = paths(&tmp);
-        let mut cfg = Config::default();
-        cfg.old_days = 92;
-        cfg.rule_short = false;
+        let cfg = Config {
+            old_days: 92,
+            rule_short: false,
+            ..Config::default()
+        };
         cfg.save(&p).unwrap();
         assert_eq!(Config::load(&p), cfg);
 
