@@ -154,7 +154,7 @@ impl App {
                 self.selected.clear();
                 let n = self.result.session_count();
                 let rec = self.recommended_ids().len();
-                self.status = format!("세션 {n}개 · 추천 {rec}개 (아무것도 선택되지 않음)");
+                self.refresh_summary();
                 logging::info(&format!("scan complete sessions={n} recommended={rec}"));
             }
         }
@@ -194,6 +194,18 @@ impl App {
         for id in blocked {
             self.selected.remove(&id);
         }
+    }
+
+    /// 상단 요약 문구. 선택이 생기면 "아무것도 선택되지 않음"을 거둔다 —
+    /// 하단에 선택 개수가 같이 찍히므로 그대로 두면 서로 모순돼 보인다.
+    pub fn refresh_summary(&mut self) {
+        let n = self.result.session_count();
+        let rec = self.recommended_ids().len();
+        self.status = if self.selected.is_empty() {
+            format!("세션 {n}개 · 추천 {rec}개 (아무것도 선택되지 않음)")
+        } else {
+            format!("세션 {n}개 · 추천 {rec}개")
+        };
     }
 
     pub fn verdict(&self, id: &str) -> Option<&Verdict> {
@@ -307,8 +319,10 @@ impl App {
     pub fn toggle_session(&mut self, id: &str) {
         if self.selected.contains(id) {
             self.selected.remove(id);
+            self.refresh_summary();
         } else if self.can_select(id) {
             self.selected.insert(id.to_string());
+            self.refresh_summary();
         } else {
             let why = self
                 .verdicts

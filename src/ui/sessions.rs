@@ -191,7 +191,8 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
     };
 
     // 이름과 이유가 나눠 쓸 수 있는 폭.
-    let fixed = 4 + 2 + 9 + size.len();
+    const GUTTER: usize = 1;
+    let fixed = 4 + 2 + 9 + size.len() + GUTTER;
     let rest = width.saturating_sub(fixed).max(20);
     let name_w = (rest * 2 / 5).max(12);
     let reason_w = rest.saturating_sub(name_w);
@@ -214,6 +215,8 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
         ),
         Span::raw(format!("{when} ")),
         Span::raw(name),
+        // 이름이 열을 꽉 채워도 이유와 붙지 않게 한다.
+        Span::raw(" ".repeat(GUTTER)),
         Span::styled(size, Style::default().fg(MUTED)),
         Span::styled(reason, Style::default().fg(reason_color)),
     ]))

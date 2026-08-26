@@ -1,6 +1,25 @@
 # sclean
 
+[![CI](https://github.com/kimtaejin3/session-clean/actions/workflows/ci.yml/badge.svg)](https://github.com/kimtaejin3/session-clean/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/session-clean)](https://www.npmjs.com/package/session-clean)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 여러 프로젝트에 쌓인 Claude Code 세션을 한 화면에서 확인하고, 명확한 기준에 따라 추천받아 한 번에 안전하게 정리하는 로컬 터미널 UI입니다.
+
+```text
+┌ Projects 3/4 ──────────────┐┌ shop-api — 세션 6 ─────────────────────────────── Trash: 0 ┐
+│  old-admin  추천 1 경로없음││  [ ]   1일 전   어제 하던 작업                             │
+│  portfolio  추천 1         ││▶ [ ]   12일 전  테스트 붙이기                              │
+│  shop-api   선택 2         ││  [ ] ★ 40일 전  빌드 오류 질문   마지막 활동 후 40일 경과 …│
+│  고아 데이… 추천 1         ││  [x] ★ 61일 전  결제 API 리팩터… 마지막 활동 후 61일 경과  │
+│                            ││  [x] ★ 92일 전  로그인 리다이렉… 마지막 활동 후 92일 경과  │
+│                            ││  [-] ! 150일 전 분석 불가 00000… 세션 형식을 분석할 수 없… │
+└────────────────────────────┘└────────────────────────────────────────────────────────────┘
+ 세션 9개 · 추천 6개 · 선택 2개 (1 KB)
+ ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료
+```
+
+기호만으로 상태를 구분할 수 있습니다 — `[x]` 선택 · `[ ]` 미선택 · `[-]` 정리 불가 · `★` 추천 · `!` 분석 불가 · `▶` 실행 중. 색은 거들 뿐입니다.
 
 ## 설치
 
@@ -29,7 +48,10 @@ cargo install --path .
 |---|---|
 | macOS arm64 / x64 | 지원 (1차 검증 환경은 Apple Silicon) |
 | Linux x64 / arm64 | 지원 |
-| Windows | 미지원 — unix 전용 파일시스템 API를 사용합니다 |
+| Windows | 네이티브 미지원 — **WSL에서 사용하세요** |
+
+Windows에서는 유닉스 전용 파일시스템 API(심볼릭 링크, 프로세스 시그널)를 써서 컴파일되지 않습니다.
+WSL 안에서 Claude Code를 쓰신다면 `~/.claude`도 WSL에 있으므로 Linux 빌드가 그대로 동작합니다.
 
 설정과 휴지통은 macOS에서 `~/Library/Application Support/sclean`, Linux에서 `~/.local/share/sclean`에 저장됩니다.
 
@@ -100,7 +122,7 @@ sclean
 `sclean` 자체 데이터는 아래 경로에만 저장합니다.
 
 ```text
-~/Library/Application Support/sclean/
+~/Library/Application Support/sclean/   (Linux: ~/.local/share/sclean/)
 ├── config.json      추천 기준
 ├── sclean.log       로컬 로그 (프롬프트 본문은 기록하지 않습니다)
 └── trash/<작업ID>/  manifest.json + 옮겨둔 파일
@@ -133,6 +155,30 @@ cargo test --release --test perf_test -- --nocapture   # 2,000 세션 스캔 시
 SCLEAN_CLAUDE_DIR=/tmp/fake-claude SCLEAN_DATA_DIR=/tmp/fake-sclean sclean
 ```
 
+화면 배치를 눈으로 확인하려면 렌더 결과를 그대로 찍어볼 수 있습니다.
+
+```sh
+cargo test --test render_test visual_dump -- --ignored --nocapture
+```
+
+### 배포
+
+npm에는 플랫폼별로 미리 빌드한 네이티브 바이너리를 올리고, 얇은 JS 런처가 `os`/`cpu`에 맞는 것을 찾아 실행합니다.
+
+```text
+session-clean                      ← 사용자가 설치하는 것 (bin/sclean.js 런처)
+├── session-clean-darwin-arm64     ← optionalDependencies. npm이 맞는 것 하나만 설치
+├── session-clean-darwin-x64
+├── session-clean-linux-x64
+└── session-clean-linux-arm64
+```
+
+태그를 밀면 GitHub Actions가 네 플랫폼을 빌드·테스트하고 npm과 GitHub 릴리스에 올립니다.
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
 ## 아직 하지 않는 것 (v0.1)
 
 - 프로젝트·세션 검색(`/`)
@@ -140,6 +186,7 @@ SCLEAN_CLAUDE_DIR=/tmp/fake-claude SCLEAN_DATA_DIR=/tmp/fake-sclean sclean
 - AI 기반 분류와 백그라운드 자동 정리
 - 클라우드 동기화와 네이티브 GUI
 - Codex·OpenCode 지원
+- 네이티브 Windows 지원 (WSL로 대체)
 - Homebrew 배포
 - 공유 paste cache·전역 plan·telemetry 정리
 
