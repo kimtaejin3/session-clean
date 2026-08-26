@@ -112,29 +112,6 @@ fn draw(frame: &mut Frame, app: &App) {
 }
 
 pub fn handle_key(app: &mut App, key: KeyEvent) {
-    // 검색 입력 중에는 문자를 그대로 받는다.
-    if app.searching && app.screen == Screen::Sessions {
-        match key.code {
-            KeyCode::Esc => {
-                app.clear_search();
-                return;
-            }
-            KeyCode::Enter => {
-                app.searching = false;
-                return;
-            }
-            KeyCode::Backspace => {
-                app.pop_search();
-                return;
-            }
-            KeyCode::Char(c) => {
-                app.push_search(c);
-                return;
-            }
-            _ => {}
-        }
-    }
-
     match app.screen {
         Screen::Sessions => sessions_key(app, key),
         Screen::Confirm => confirm_key(app, key),
@@ -174,7 +151,6 @@ fn sessions_key(app: &mut App, key: KeyEvent) {
         KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => app.focus_sessions(),
         KeyCode::Char(' ') => app.toggle_current(),
         KeyCode::Char('a') | KeyCode::Char('A') => app.toggle_all_recommended(),
-        KeyCode::Char('/') => app.start_search(),
         KeyCode::Char('d') | KeyCode::Char('D') => app.open_confirm(),
         KeyCode::Char('t') | KeyCode::Char('T') => app.open_trash(),
         KeyCode::Char('f') | KeyCode::Char('F') => {
@@ -185,7 +161,6 @@ fn sessions_key(app: &mut App, key: KeyEvent) {
             app.previous_screen = Screen::Sessions;
             app.screen = Screen::Help;
         }
-        KeyCode::Esc if !app.search.is_empty() => app.clear_search(),
         _ => {}
     }
 }

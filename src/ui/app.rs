@@ -78,9 +78,6 @@ pub struct App {
     pub session_cursor: usize,
     pub selected: HashSet<String>,
 
-    pub search: String,
-    pub searching: bool,
-
     pub screen: Screen,
     pub previous_screen: Screen,
     pub focus: Focus,
@@ -123,8 +120,6 @@ impl App {
             project_cursor: 0,
             session_cursor: 0,
             selected: HashSet::new(),
-            search: String::new(),
-            searching: false,
             screen,
             previous_screen: Screen::Sessions,
             focus: Focus::Projects,
@@ -165,6 +160,22 @@ impl App {
         }
     }
 
+    /// 파일을 바꾼 뒤 화면을 실제 상태와 다시 맞춘다.
+    ///
+    /// 이걸 빼먹으면 방금 지운 세션이 목록에 그대로 남는다.
+    /// 스캔은 2,000개 기준 수십 ms라 그 자리에서 해도 된다.
+    pub fn rescan(&mut self) {
+        self.result = crate::scan::scan(&self.paths);
+        self.now = now_secs();
+        self.live = LiveSessions::detect(&self.paths);
+        self.recompute_verdicts();
+        // 사라진 세션은 선택에서도 빠져야 한다.
+        let alive: std::collections::HashSet<String> =
+            self.result.sessions().map(|s| s.id.clone()).collect();
+        self.selected.retain(|id| alive.contains(id));
+        self.clamp_cursors();
+    }
+
     pub fn recompute_verdicts(&mut self) {
         let cfg = self.config.clone();
         let now = self.now;
@@ -194,53 +205,21 @@ impl App {
     // 왼쪽에서 고른 프로젝트의 세션만 오른쪽에 보인다. 두 패널은 각자
     // 커서를 갖고, `←` `→` 로 어느 쪽을 움직일지 정한다.
 
-    fn needle(&self) -> String {
-        self.search.to_lowercase()
-    }
-
-    fn project_matches(&self, p: &crate::scan::session::Project, needle: &str) -> bool {
-        needle.is_empty()
-            || p.label.to_lowercase().contains(needle)
-            || p.short_label().to_lowercase().contains(needle)
-    }
-
-    /// 검색을 통과한 프로젝트들의 인덱스.
-    ///
-    /// 프로젝트 이름이 맞거나, 그 안에 맞는 세션이 하나라도 있으면 보인다.
+    /// 목록에 보이는 프로젝트들의 인덱스.
     pub fn visible_projects(&self) -> Vec<usize> {
-        let needle = self.needle();
-        self.result
-            .projects
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| {
-                self.project_matches(p, &needle) || p.sessions.iter().any(|s| s.matches(&needle))
-            })
-            .map(|(i, _)| i)
-            .collect()
+        (0..self.result.projects.len()).collect()
     }
 
     pub fn current_project(&self) -> Option<&crate::scan::session::Project> {
-        let visible = self.visible_projects();
-        let idx = *visible.get(self.project_cursor)?;
-        self.result.projects.get(idx)
+        self.result.projects.get(self.project_cursor)
     }
 
-    /// 현재 프로젝트에서 검색을 통과한 세션들.
-    ///
-    /// 프로젝트 이름으로 찾았다면 그 안의 세션은 모두 보여준다 —
-    /// "shop-api" 를 검색했는데 세션이 하나도 안 보이면 당황스럽다.
+    /// 현재 프로젝트의 세션들.
     pub fn visible_sessions(&self) -> Vec<&crate::scan::session::Session> {
-        let needle = self.needle();
-        let Some(project) = self.current_project() else {
-            return Vec::new();
-        };
-        let show_all = self.project_matches(project, &needle);
-        project
-            .sessions
-            .iter()
-            .filter(|s| show_all || s.matches(&needle))
-            .collect()
+        match self.current_project() {
+            Some(p) => p.sessions.iter().collect(),
+            None => Vec::new(),
+        }
     }
 
     pub fn current_session(&self) -> Option<&crate::scan::session::Session> {
@@ -253,7 +232,7 @@ impl App {
 
     /// 목록이 줄어들었을 때 커서가 밖으로 나가지 않게 한다.
     pub fn clamp_cursors(&mut self) {
-        let projects = self.visible_projects().len();
+        let projects = self.result.projects.len();
         if projects == 0 {
             self.project_cursor = 0;
             self.session_cursor = 0;
@@ -268,31 +247,11 @@ impl App {
         self.result.sessions().find(|s| s.id == id)
     }
 
-    /// 화면(=현재 검색)에서 추천으로 표시된 세션 전체.
-    /// 왼쪽에서 고른 프로젝트뿐 아니라 검색에 걸린 모든 프로젝트가 대상이다
-    /// — PRD §8.5의 "현재 필터에서 추천 항목 전체".
-    pub fn visible_recommended(&self) -> Vec<String> {
-        let needle = self.needle();
-        let mut out = Vec::new();
-        for idx in self.visible_projects() {
-            let project = &self.result.projects[idx];
-            let show_all = self.project_matches(project, &needle);
-            for s in &project.sessions {
-                if (show_all || s.matches(&needle))
-                    && self.verdicts.get(&s.id).is_some_and(|v| v.recommended())
-                {
-                    out.push(s.id.clone());
-                }
-            }
-        }
-        out
-    }
-
     pub fn recommended_ids(&self) -> Vec<String> {
-        self.verdicts
-            .iter()
-            .filter(|(_, v)| v.recommended())
-            .map(|(k, _)| k.clone())
+        self.result
+            .sessions()
+            .filter(|s| self.verdicts.get(&s.id).is_some_and(|v| v.recommended()))
+            .map(|s| s.id.clone())
             .collect()
     }
 
@@ -365,11 +324,11 @@ impl App {
         self.verdicts.get(id).is_some_and(|v| v.cleanable())
     }
 
-    /// `A`: 현재 필터에서 추천 항목 전체 선택·해제 (FR-05).
+    /// `A`: 추천 항목 전체 선택·해제 (FR-05).
     pub fn toggle_all_recommended(&mut self) {
-        let ids = self.visible_recommended();
+        let ids = self.recommended_ids();
         if ids.is_empty() {
-            self.status = "현재 화면에 추천 항목이 없습니다".into();
+            self.status = "추천 항목이 없습니다".into();
             return;
         }
         let all_on = ids.iter().all(|i| self.selected.contains(i));
@@ -381,9 +340,13 @@ impl App {
                 self.selected.insert(id);
             }
         }
-        // 현재 보고 있는 프로젝트뿐 아니라 검색에 걸린 전부가 대상이므로
-        // 몇 개 프로젝트에 걸쳐 있는지까지 밝힌다.
-        let projects = self.visible_projects().len();
+        // 지금 보고 있는 프로젝트뿐 아니라 전부가 대상이므로 범위를 밝힌다.
+        let projects = self
+            .result
+            .projects
+            .iter()
+            .filter(|p| self.recommended_in(p) > 0)
+            .count();
         self.status = if all_on {
             format!("추천 {count}개 선택 해제")
         } else {
@@ -511,7 +474,7 @@ impl App {
             }
         }
         self.trash_ops = trash::list(&self.paths);
-        self.clamp_cursors();
+        self.rescan();
         self.screen = Screen::Result;
     }
 
@@ -617,6 +580,7 @@ impl App {
         };
         self.restore_outcome = Some(combined);
         self.trash_selected.clear();
+        self.rescan();
         self.open_trash();
     }
 
@@ -638,6 +602,7 @@ impl App {
             crate::ops::fsutil::human_bytes(freed)
         );
         self.trash_selected.clear();
+        self.rescan();
         self.open_trash();
     }
 
@@ -661,6 +626,7 @@ impl App {
             }
         }
         self.pending_ops = trash::incomplete(&self.paths);
+        self.rescan();
         self.status = format!("중단된 작업 복구: {restored}개 복원 · {conflicts}개 충돌");
         self.screen = Screen::Sessions;
     }
@@ -697,36 +663,6 @@ impl App {
             self.status = format!("설정을 저장하지 못했습니다: {e:#}");
         }
         self.recompute_verdicts();
-        self.clamp_cursors();
-    }
-
-    // ---------- 검색 ----------
-
-    pub fn start_search(&mut self) {
-        self.searching = true;
-    }
-
-    pub fn push_search(&mut self, c: char) {
-        self.search.push(c);
-        self.on_search_changed();
-    }
-
-    pub fn pop_search(&mut self) {
-        self.search.pop();
-        self.on_search_changed();
-    }
-
-    pub fn clear_search(&mut self) {
-        self.search.clear();
-        self.searching = false;
-        self.on_search_changed();
-    }
-
-    /// 검색이 바뀌면 보이는 목록이 통째로 달라지므로 커서를 처음으로 되돌린다.
-    fn on_search_changed(&mut self) {
-        self.project_cursor = 0;
-        self.session_cursor = 0;
-        self.focus = Focus::Projects;
         self.clamp_cursors();
     }
 

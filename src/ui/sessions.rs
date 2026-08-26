@@ -134,11 +134,7 @@ fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
         .current_project()
         .map(|p| p.short_label())
         .unwrap_or_else(|| "—".into());
-    let title = if app.search.is_empty() {
-        format!(" {project} — 세션 {} ", sessions.len())
-    } else {
-        format!(" {project} — 검색 '{}' · {} ", app.search, sessions.len())
-    };
+    let title = format!(" {project} — 세션 {} ", sessions.len());
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -224,9 +220,6 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
 }
 
 fn empty_message(app: &App) -> Text<'static> {
-    if !app.search.is_empty() {
-        return Text::from(format!("  '{}' 와(과) 맞는 세션이 없습니다", app.search));
-    }
     if !app.paths.claude_dir_exists() {
         return Text::from(vec![
             Line::from("  Claude Code 세션을 찾지 못했습니다."),
@@ -274,26 +267,22 @@ pub fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     // 지금 어느 패널에 있는지에 따라 안내가 달라진다.
     // 잘린 안내는 안내가 아니다. 넓은 문구부터 실제로 들어가는지 재보고
     // 들어가는 것 중 가장 자세한 것을 쓴다. 마지막 것은 최소 폭(50)에서도 들어간다.
-    let keys = if app.searching {
-        " 입력: 검색   Enter 확정   Esc 취소"
-    } else {
-        let full = match app.focus {
-            Focus::Projects => {
-                " ↑↓ 프로젝트  → 세션 보기  Space 전체선택  A 추천전체  D 정리  T 휴지통  F 기준  / 검색  ? 도움말  Q 종료"
-            }
-            Focus::Sessions => {
-                " ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  / 검색  ? 도움말  Q 종료"
-            }
-        };
-        [
-            full,
-            " ↑↓ 이동  ←→ 패널  Space 선택  A 추천  D 정리  T 휴지통  ? 도움말  Q 종료",
-            " ↑↓←→ 이동  Space 선택  A 추천  D 정리  ? 도움말",
-        ]
-        .into_iter()
-        .find(|k| theme::display_width(k) <= area.width as usize)
-        .unwrap_or(" ? 도움말  Q 종료")
+    let full = match app.focus {
+        Focus::Projects => {
+            " ↑↓ 프로젝트  → 세션 보기  Space 전체선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료"
+        }
+        Focus::Sessions => {
+            " ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료"
+        }
     };
+    let keys = [
+        full,
+        " ↑↓ 이동  ←→ 패널  Space 선택  A 추천  D 정리  T 휴지통  ? 도움말  Q 종료",
+        " ↑↓←→ 이동  Space 선택  A 추천  D 정리  ? 도움말",
+    ]
+    .into_iter()
+    .find(|k| theme::display_width(k) <= area.width as usize)
+    .unwrap_or(" ? 도움말  Q 종료");
     frame.render_widget(
         Paragraph::new(theme::fit(keys, area.width as usize)).style(Style::default().fg(MUTED)),
         rows[1],

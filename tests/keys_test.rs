@@ -155,24 +155,6 @@ fn escape_cancels_the_confirmation_without_touching_anything() {
 }
 
 #[test]
-fn search_mode_captures_letters_instead_of_shortcuts() {
-    let f = Fixture::new();
-    seeded(&f);
-    let mut app = ready_app(&f);
-
-    press(&mut app, KeyCode::Char('/'));
-    assert!(app.searching);
-    // 'd'는 정리가 아니라 검색어가 되어야 한다.
-    press(&mut app, KeyCode::Char('d'));
-    assert_eq!(app.screen, Screen::Sessions);
-    assert_eq!(app.search, "d");
-
-    press(&mut app, KeyCode::Esc);
-    assert!(!app.searching);
-    assert!(app.search.is_empty());
-}
-
-#[test]
 fn help_opens_and_returns_to_the_previous_screen() {
     let f = Fixture::new();
     seeded(&f);

@@ -48,12 +48,6 @@ impl Session {
         }
         kinds
     }
-
-    /// 검색 대상 텍스트 (FR-04).
-    pub fn matches(&self, needle_lower: &str) -> bool {
-        self.display_name.to_lowercase().contains(needle_lower)
-            || self.id.to_lowercase().contains(needle_lower)
-    }
 }
 
 #[derive(Clone, Debug)]

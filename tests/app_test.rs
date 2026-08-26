@@ -1,4 +1,5 @@
-//! PRD §16 필수 자동 검증 4: 검색, 개별 선택, 추천 전체 선택.
+//! PRD §16 필수 자동 검증 4: 개별 선택과 추천 전체 선택.
+//! (검색은 v0.1 범위에서 제외했다 — PRD FR-04와 의도적으로 다르다.)
 //! 그리고 §6 안전 우선: 시작 시 아무것도 선택되어 있지 않아야 한다.
 
 mod support;
@@ -78,38 +79,6 @@ fn toggle_all_recommended_selects_only_recommended() {
 }
 
 #[test]
-fn search_filters_projects_and_sessions() {
-    let f = Fixture::new();
-    let (_a, old_b, _c) = seeded(&f);
-    let mut app = ready_app(&f);
-    assert_eq!(app.visible_projects().len(), 2);
-
-    // 세션 이름으로 찾으면 그 세션을 가진 프로젝트만 남는다.
-    app.start_search();
-    for c in "포트폴리오".chars() {
-        app.push_search(c);
-    }
-    assert_eq!(app.visible_projects().len(), 1);
-    let ids: Vec<&str> = app
-        .visible_sessions()
-        .iter()
-        .map(|s| s.id.as_str())
-        .collect();
-    assert_eq!(ids, vec![old_b.as_str()], "세션 이름으로 찾는다");
-
-    app.clear_search();
-    assert_eq!(app.visible_projects().len(), 2);
-
-    // 프로젝트 이름으로 찾으면 그 안의 세션이 모두 보인다.
-    app.start_search();
-    for c in "shop-api".chars() {
-        app.push_search(c);
-    }
-    assert_eq!(app.visible_projects().len(), 1);
-    assert_eq!(app.visible_sessions().len(), 2);
-}
-
-#[test]
 fn choosing_a_project_shows_only_that_projects_sessions() {
     let f = Fixture::new();
     let (old_a, old_b, fresh) = seeded(&f);
@@ -160,18 +129,19 @@ fn switching_projects_resets_the_session_cursor() {
 }
 
 #[test]
-fn toggle_all_recommended_respects_the_current_filter() {
+fn toggle_all_recommended_spans_every_project() {
     let f = Fixture::new();
-    let (old_a, _old_b, _) = seeded(&f);
+    let (old_a, old_b, fresh) = seeded(&f);
     let mut app = ready_app(&f);
 
-    app.start_search();
-    for c in "shop-api".chars() {
-        app.push_search(c);
-    }
+    // 보고 있는 프로젝트와 무관하게 추천 전체가 대상이다.
+    app.project_cursor = 0;
     app.toggle_all_recommended();
-    assert_eq!(app.selected.len(), 1, "필터에 보이는 추천만 선택한다");
+    assert_eq!(app.selected.len(), 2);
     assert!(app.selected.contains(&old_a));
+    assert!(app.selected.contains(&old_b));
+    assert!(!app.selected.contains(&fresh));
+    assert!(app.status.contains("프로젝트 2개"), "{}", app.status);
 }
 
 #[test]
@@ -513,4 +483,45 @@ fn empty_claude_dir_produces_an_empty_but_working_app() {
     assert!(app.visible_sessions().is_empty());
     assert!(app.current_session().is_none());
     assert!(!app.quit);
+}
+
+#[test]
+fn the_list_refreshes_after_a_cleanup() {
+    let f = Fixture::new();
+    let (old_a, _old_b, fresh) = seeded(&f);
+    let mut app = ready_app(&f);
+    assert_eq!(app.result.session_count(), 3);
+
+    app.toggle_all_recommended();
+    app.open_confirm();
+    app.run_cleanup();
+
+    assert_eq!(
+        app.result.session_count(),
+        1,
+        "정리한 세션이 화면에 남아 있으면 안 된다"
+    );
+    assert!(app.session(&old_a).is_none());
+    assert!(app.session(&fresh).is_some());
+    assert!(app.selected.is_empty());
+}
+
+#[test]
+fn the_list_refreshes_after_a_restore() {
+    let f = Fixture::new();
+    seeded(&f);
+    let mut app = ready_app(&f);
+    app.toggle_all_recommended();
+    app.open_confirm();
+    app.run_cleanup();
+    assert_eq!(app.result.session_count(), 1);
+
+    app.open_trash();
+    app.trash_cursor = 0;
+    app.restore_selection();
+    assert_eq!(
+        app.result.session_count(),
+        3,
+        "복원한 세션이 바로 보여야 한다"
+    );
 }
