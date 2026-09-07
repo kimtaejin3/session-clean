@@ -214,8 +214,11 @@ pub fn execute_with(
 
     // --- 3단계: 경로 검증. 하나라도 밖에 있으면 아무것도 하지 않는다 (FR-16) ---
     for t in &ready {
+        // 각 세션은 자기 에이전트의 데이터 루트 안에만 있어야 한다.
+        let root = crate::agents::root_of(paths, t.session.agent)
+            .ok_or_else(|| anyhow::anyhow!("알 수 없는 에이전트입니다: {}", t.session.agent))?;
         for a in &t.session.artifacts {
-            fsutil::ensure_within(&paths.claude_dir, &a.path).with_context(|| {
+            fsutil::ensure_within(&root, &a.path).with_context(|| {
                 format!(
                     "안전 검증 실패 — 작업을 실행하지 않았습니다 (세션 {})",
                     t.session.id
@@ -251,6 +254,7 @@ pub fn execute_with(
             });
         }
         manifest.sessions.push(ManifestSession {
+            agent: t.session.agent.to_string(),
             session_id: t.session.id.clone(),
             project_key: t.session.project_key.clone(),
             project_path: t

@@ -1,10 +1,14 @@
 {
   "name": "session-clean",
-  "version": "0.1.0",
-  "description": "Claude Code 세션을 프로젝트별로 확인하고 규칙 기반 추천으로 안전하게 정리하는 로컬 터미널 UI",
+  "version": "0.2.0",
+  "description": "여러 코딩 에이전트(Claude Code · Codex · Gemini CLI · Copilot CLI · Continue)의 세션을 안전하게 정리하는 로컬 터미널 UI",
   "keywords": [
     "claude",
     "claude-code",
+    "codex",
+    "gemini-cli",
+    "copilot",
+    "continue",
     "cli",
     "tui",
     "cleanup",
@@ -29,9 +33,9 @@
     "node": ">=16"
   },
   "optionalDependencies": {
-    "session-clean-darwin-arm64": "0.1.0",
-    "session-clean-darwin-x64": "0.1.0",
-    "session-clean-linux-x64": "0.1.0",
-    "session-clean-linux-arm64": "0.1.0"
+    "session-clean-darwin-arm64": "0.2.0",
+    "session-clean-darwin-x64": "0.2.0",
+    "session-clean-linux-x64": "0.2.0",
+    "session-clean-linux-arm64": "0.2.0"
   }
 }

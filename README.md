@@ -4,18 +4,21 @@
 [![npm](https://img.shields.io/npm/v/session-clean)](https://www.npmjs.com/package/session-clean)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-여러 프로젝트에 쌓인 Claude Code 세션을 한 화면에서 확인하고, 명확한 기준에 따라 추천받아 한 번에 안전하게 정리하는 로컬 터미널 UI입니다.
+여러 코딩 에이전트에 쌓인 세션을 한 화면에서 확인하고, 명확한 기준에 따라 추천받아 한 번에 안전하게 정리하는 로컬 터미널 UI입니다.
 
 ```text
-┌ Projects 3/4 ──────────────┐┌ shop-api — 세션 6 ─────────────────────────────── Trash: 0 ┐
-│  old-admin  추천 1 경로없음││  [ ]   1일 전   어제 하던 작업                             │
-│  portfolio  추천 1         ││▶ [ ]   12일 전  테스트 붙이기                              │
-│  shop-api   선택 2         ││  [ ] ★ 40일 전  빌드 오류 질문   마지막 활동 후 40일 경과 …│
-│  고아 데이… 추천 1         ││  [x] ★ 61일 전  결제 API 리팩터… 마지막 활동 후 61일 경과  │
-│                            ││  [x] ★ 92일 전  로그인 리다이렉… 마지막 활동 후 92일 경과  │
-│                            ││  [-] ! 150일 전 분석 불가 00000… 세션 형식을 분석할 수 없… │
-└────────────────────────────┘└────────────────────────────────────────────────────────────┘
- 세션 9개 · 추천 6개 · 선택 2개 (1 KB)
+┌ Projects 2/5 ──────────────┐┌ Codex · shop-api — 세션 2 ─────────────────── Trash: 0 ┐
+│  ── Claude Code            ││  [x] ★ 92일 전  로그인 리다이렉…  마지막 활동 후 92일…  │
+│  blog                      ││  [ ] ★ 45일 전  빌드 오류 질문    사용자 메시지 1개…    │
+│  shop-api        추천 2    ││                                                        │
+│▶ ── Codex                  ││                                                        │
+│  shop-api        추천 2    ││                                                        │
+│  ── Gemini CLI (미검증)    ││                                                        │
+│  a1b2c3d4        확인불가  ││                                                        │
+│  ── Continue               ││                                                        │
+│  shop-api        추천 1    ││                                                        │
+└────────────────────────────┘└────────────────────────────────────────────────────────┘
+ 세션 9개 · 추천 5개 · 선택 1개 (1 KB)
  ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료
 ```
 
@@ -41,6 +44,22 @@ sclean
 ```sh
 cargo install --path .
 ```
+
+### 지원 에이전트
+
+세션 하나가 파일 하나인 에이전트만 지원합니다. sclean 의 안전 모델이 "파일을 휴지통으로 옮겼다가 되돌리는 것"이라, 세션을 SQLite 행으로 넣는 도구(Cursor, OpenCode, Goose 등)에는 그대로 적용되지 않습니다.
+
+| 에이전트 | 저장 위치 | 형식 확인 |
+|---|---|---|
+| Claude Code | `~/.claude/projects/<cwd>/<uuid>.jsonl` | 실제 데이터로 확인 |
+| Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | 실제 데이터로 확인 |
+| Continue | `~/.continue/sessions/<uuid>.json` | 실제 데이터로 확인 |
+| Gemini CLI | `~/.gemini/tmp/<hash>/chats/*.json` | 문서 기준 |
+| Copilot CLI | `~/.copilot/session-state/` | 문서 기준 |
+
+`문서 기준`인 두 에이전트는 화면에 `(미검증)`으로 표시합니다. 실제 형식이 다르면 `분석 불가`가 되어 **정리가 차단**되므로, 잘못 지우는 대신 아무것도 하지 않습니다.
+
+설치되지 않은 에이전트는 조용히 건너뜁니다. 각 에이전트의 정리 대상은 자기 데이터 루트 안에 있는지 검증하므로, 한 에이전트를 정리해도 다른 에이전트의 파일은 건드리지 않습니다.
 
 ### 지원 플랫폼
 
@@ -110,6 +129,8 @@ sclean
 
 `sclean`은 아래 경로 중 실제로 존재하는 곳만 읽습니다. 경로가 없어도 오류로 처리하지 않습니다.
 
+**Claude Code**
+
 ```text
 ~/.claude/projects/<프로젝트>/<세션>.jsonl   대화 기록
 ~/.claude/projects/<프로젝트>/<세션>/        하위 에이전트 기록
@@ -117,6 +138,16 @@ sclean
 ~/.claude/session-env/  file-history/  todos/  debug/
 ~/.claude/sessions/                          실행 중 세션 잠금 (읽기만)
 ~/.claude/history.jsonl                      공유 기록 (소유가 확정되는 줄만 수정)
+```
+
+**그 밖의 에이전트**
+
+```text
+~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl   세션 (첫 줄에 cwd 가 있음)
+~/.codex/archived_sessions/                    보관된 세션
+~/.continue/sessions/<uuid>.json               세션 (title · workspaceDirectory 포함)
+~/.gemini/tmp/<project_hash>/chats/*.json      세션 (프로젝트는 해시로만 표현)
+~/.copilot/session-state/                      세션
 ```
 
 `sclean` 자체 데이터는 아래 경로에만 저장합니다.

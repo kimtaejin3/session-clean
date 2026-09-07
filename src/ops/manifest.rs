@@ -67,6 +67,9 @@ pub struct SharedRecord {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ManifestSession {
+    /// 어느 에이전트의 세션인가. 복원 시 경로 검증 기준이 된다.
+    #[serde(default = "default_agent")]
+    pub agent: String,
     pub session_id: String,
     pub project_key: String,
     pub project_path: Option<String>,
@@ -75,6 +78,11 @@ pub struct ManifestSession {
     pub reasons: Vec<String>,
     pub files: Vec<ManifestFile>,
     pub shared: Vec<SharedRecord>,
+}
+
+/// 이 필드가 없던 시절의 작업 기록은 전부 Claude Code 였다.
+fn default_agent() -> String {
+    "claude".to_string()
 }
 
 impl ManifestSession {
@@ -161,6 +169,7 @@ mod tests {
     fn sample() -> Manifest {
         let mut m = Manifest::new("20260826-120000-001".into(), CleanupMode::Trash);
         m.sessions.push(ManifestSession {
+            agent: "claude".into(),
             session_id: "aaaa".into(),
             project_key: "-w".into(),
             project_path: Some("/w".into()),

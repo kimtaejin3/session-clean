@@ -394,16 +394,15 @@ fn recovery_modal_explains_what_will_happen() {
 fn visual_dump() {
     let f = Fixture::new();
     let shop = f.source_tree("shop-api");
-    let port = f.source_tree("portfolio");
-    let gone = f.dir.path().join("work/old-admin");
+    let blog = f.source_tree("blog");
 
-    for (root, n, days, name) in [
-        (&shop, 1u32, 92i64, "로그인 리다이렉트 수정"),
-        (&shop, 2, 61, "결제 API 리팩터링"),
-        (&shop, 3, 12, "테스트 붙이기"),
-        (&shop, 4, 1, "어제 하던 작업"),
+    for (n, days, name) in [
+        (1u32, 92i64, "로그인 리다이렉트 수정"),
+        (2, 61, "결제 API 리팩터링"),
+        (3, 12, "테스트 붙이기"),
+        (4, 1, "어제 하던 작업"),
     ] {
-        f.session(root.to_str().unwrap(), &uuid(n))
+        f.session(shop.to_str().unwrap(), &uuid(n))
             .summary(name)
             .user("q1")
             .user("q2")
@@ -412,34 +411,22 @@ fn visual_dump() {
             .age_days(days)
             .build();
     }
-    // 한 번 묻고 끝난 세션 (R3)
     f.session(shop.to_str().unwrap(), &uuid(5))
         .summary("빌드 오류 질문")
         .user("이 에러 뭐야")
         .age_days(40)
         .build();
-    // 형식을 알 수 없는 세션 — 정리 차단
     f.session(shop.to_str().unwrap(), &uuid(6))
         .raw_line("알 수 없는 형식")
         .age_days(150)
         .build();
-
-    f.session(port.to_str().unwrap(), &uuid(7))
-        .summary("포트폴리오 정리")
+    f.session(blog.to_str().unwrap(), &uuid(7))
+        .summary("포스트 정리")
         .user("q")
         .age_days(61)
         .build();
-    f.session(gone.to_str().unwrap(), &uuid(8))
-        .summary("옛 관리자 페이지")
-        .user("q1")
-        .user("q2")
-        .tool_use("Bash")
-        .age_days(140)
-        .build();
-    f.orphan_env_aged(&uuid(60), 200);
 
     let mut app = ready_app(&f);
-    // shop-api 를 고르고 세션 패널에서 두 개를 선택한 상태.
     app.project_cursor = app
         .visible_projects()
         .iter()
@@ -452,7 +439,29 @@ fn visual_dump() {
     app.toggle_current();
     app.session_cursor = 1;
 
-    for (label, w, h) in [("README 92칸", 92u16, 14u16), ("좁은 화면 68칸", 68, 12)] {
-        println!("\n[{label}]\n{}", draw(&app, w, h, Screen::Sessions));
-    }
+    println!("\n[README 92칸]\n{}", draw(&app, 92, 14, Screen::Sessions));
+}
+
+#[test]
+#[ignore = "여러 에이전트 화면 육안 확인용"]
+fn visual_dump_multi_agent() {
+    let f = Fixture::new();
+    let shop = f.source_tree("shop-api");
+    let blog = f.source_tree("blog");
+    f.claude_session_in_home(shop.to_str().unwrap(), &uuid(1), 92);
+    f.claude_session_in_home(blog.to_str().unwrap(), &uuid(2), 30);
+    f.codex_session(shop.to_str().unwrap(), &uuid(3), 120);
+    f.codex_short_session(shop.to_str().unwrap(), &uuid(4), 45);
+    f.continue_session(shop.to_str().unwrap(), &uuid(5), "결제 버그 추적", 70);
+    f.gemini_session("a1b2c3d4", "session-1", 88);
+
+    let mut app = App::new(f.home_paths());
+    app.on_scan_event(ScanEvent::Done(Box::new(scan(&f.home_paths()))));
+    println!(
+        "\n[여러 에이전트 · 96칸]\n{}",
+        draw(&app, 96, 16, Screen::Sessions)
+    );
+    app.project_cursor = 1;
+    app.focus_sessions();
+    println!("\n[Codex 선택]\n{}", draw(&app, 96, 16, Screen::Sessions));
 }

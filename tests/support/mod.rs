@@ -40,6 +40,132 @@ impl Fixture {
         Paths::with_roots(self.dir.path().join("claude"), self.dir.path().join("data"))
     }
 
+    /// 여러 에이전트를 한 홈 아래에 두고 쓰는 fixture.
+    pub fn home_paths(&self) -> Paths {
+        Paths::with_home(self.dir.path().join("home"), self.dir.path().join("data"))
+    }
+
+    /// Codex 세션 하나를 만든다. 실제 rollout 형식을 그대로 쓴다.
+    pub fn codex_session(&self, cwd: &str, id: &str, age_days: i64) -> PathBuf {
+        let p = self.home_paths();
+        let dir = p.agent_root("codex").join("sessions/2026/09/04");
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join(format!("rollout-2026-09-04T20-16-25-{id}.jsonl"));
+        let body = [
+            format!(
+                r#"{{"timestamp":"2026-09-04T20:16:25Z","type":"session_meta","ordinal":0,"payload":{{"cwd":{},"session_id":{}}}}}"#,
+                quote(cwd),
+                quote(id)
+            ),
+            r#"{"timestamp":"2026-09-04T20:16:30Z","type":"response_item","ordinal":1,"payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"첫 질문"}]}}"#.to_string(),
+            r#"{"timestamp":"2026-09-04T20:17:00Z","type":"response_item","ordinal":2,"payload":{"type":"message","role":"user","content":"두번째"}}"#.to_string(),
+            r#"{"timestamp":"2026-09-04T20:17:10Z","type":"response_item","ordinal":3,"payload":{"type":"custom_tool_call","name":"shell"}}"#.to_string(),
+        ]
+        .join("\n");
+        std::fs::write(&f, body).unwrap();
+        if age_days > 0 {
+            set_age(&f, age_days * DAY);
+        }
+        f
+    }
+
+    /// 사용자 메시지 하나뿐인 Codex 세션 (R3 대상).
+    pub fn codex_short_session(&self, cwd: &str, id: &str, age_days: i64) -> PathBuf {
+        let p = self.home_paths();
+        let dir = p.agent_root("codex").join("sessions/2026/09/04");
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join(format!("rollout-2026-09-04T21-00-00-{id}.jsonl"));
+        let body = [
+            format!(
+                r#"{{"timestamp":"2026-09-04T21:00:00Z","type":"session_meta","payload":{{"cwd":{}}}}}"#,
+                quote(cwd)
+            ),
+            r#"{"timestamp":"2026-09-04T21:00:05Z","type":"response_item","payload":{"type":"message","role":"user","content":"한 번만"}}"#.to_string(),
+        ]
+        .join("\n");
+        std::fs::write(&f, body).unwrap();
+        if age_days > 0 {
+            set_age(&f, age_days * DAY);
+        }
+        f
+    }
+
+    /// Continue 세션 하나.
+    pub fn continue_session(
+        &self,
+        workspace: &str,
+        id: &str,
+        title: &str,
+        age_days: i64,
+    ) -> PathBuf {
+        let p = self.home_paths();
+        let dir = p.agent_root("continue").join("sessions");
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join(format!("{id}.json"));
+        std::fs::write(
+            &f,
+            format!(
+                r#"{{"sessionId":{},"title":{},"workspaceDirectory":{},"mode":"agent","history":[
+                    {{"message":{{"role":"user","content":"q1"}}}},
+                    {{"message":{{"role":"assistant","content":"a","toolCalls":[{{"id":"1"}}]}}}},
+                    {{"message":{{"role":"user","content":"q2"}}}}]}}"#,
+                quote(id),
+                quote(title),
+                quote(workspace)
+            ),
+        )
+        .unwrap();
+        if age_days > 0 {
+            set_age(&f, age_days * DAY);
+        }
+        f
+    }
+
+    /// Gemini CLI 세션 하나 (문서 기준 형식).
+    pub fn gemini_session(&self, hash: &str, name: &str, age_days: i64) -> PathBuf {
+        let p = self.home_paths();
+        let dir = p.agent_root("gemini").join("tmp").join(hash).join("chats");
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join(format!("{name}.json"));
+        std::fs::write(
+            &f,
+            r#"{"title":"제미나이 세션","messages":[
+                {"role":"user","parts":[{"text":"q1"}]},
+                {"role":"model","parts":[{"functionCall":{"name":"read_file"}}]},
+                {"role":"user","parts":[{"text":"q2"}]}]}"#,
+        )
+        .unwrap();
+        if age_days > 0 {
+            set_age(&f, age_days * DAY);
+        }
+        f
+    }
+
+    /// Claude 세션을 home 기준 경로에 만든다 (여러 에이전트 혼합 테스트용).
+    pub fn claude_session_in_home(&self, cwd: &str, id: &str, age_days: i64) -> PathBuf {
+        let p = self.home_paths();
+        let dir = p
+            .agent_root("claude")
+            .join("projects")
+            .join(encode_key(cwd));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join(format!("{id}.jsonl"));
+        let body = [
+            format!(
+                r#"{{"type":"user","cwd":{},"timestamp":"2026-09-01T00:00:00Z","message":{{"content":"질문 1"}}}}"#,
+                quote(cwd)
+            ),
+            r#"{"type":"user","message":{"content":"질문 2"}}"#.to_string(),
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit"}]}}"#.to_string(),
+        ]
+        .join("\n");
+        std::fs::write(&f, body).unwrap();
+        if age_days > 0 {
+            set_age(&f, age_days * DAY);
+        }
+        f
+    }
+
     pub fn claude(&self) -> PathBuf {
         self.dir.path().join("claude")
     }

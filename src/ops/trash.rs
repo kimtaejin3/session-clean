@@ -166,7 +166,9 @@ fn restore_session(
                 .push((session.display_name.clone(), original));
             continue;
         }
-        if fsutil::ensure_within(&paths.claude_dir, &original).is_err() {
+        let root =
+            crate::agents::root_of(paths, &session.agent).unwrap_or_else(|| paths.claude_dir());
+        if fsutil::ensure_within(&root, &original).is_err() {
             all_ok = false;
             outcome.failed.push((
                 session.display_name.clone(),

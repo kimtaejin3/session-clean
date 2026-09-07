@@ -440,6 +440,7 @@ fn recovery_screen_takes_priority_at_startup() {
     let size = std::fs::metadata(&original).unwrap().len();
     sclean::ops::fsutil::move_path(&original, &dir.join("files/0/0-t.jsonl")).unwrap();
     m.sessions.push(sclean::ops::manifest::ManifestSession {
+        agent: "claude".into(),
         session_id: ids.0.clone(),
         project_key: "shop".into(),
         project_path: None,

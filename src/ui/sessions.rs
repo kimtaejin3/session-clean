@@ -47,12 +47,25 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
     let inner = area.width.saturating_sub(4) as usize;
 
     let mut items: Vec<ListItem> = Vec::new();
+    let mut last_agent: Option<&str> = None;
     for &idx in &visible {
         let p = &app.result.projects[idx];
+        // 에이전트가 바뀌는 지점에 이름을 찍어 어느 도구의 프로젝트인지 드러낸다.
+        if last_agent != Some(p.agent) {
+            last_agent = Some(p.agent);
+            let mut title = crate::agents::label_of(p.agent);
+            if !crate::agents::verified_id(p.agent) {
+                title.push_str(" (미검증)");
+            }
+            items.push(ListItem::new(Line::from(Span::styled(
+                theme::fit(&format!("── {title}"), inner + 2),
+                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            ))));
+        }
+
         let recommended = app.recommended_in(p);
         let selected = app.selected_in(p);
 
-        // 상태는 색이 아니라 낱말로도 구분된다.
         let note = match p.exists {
             Some(false) => "경로없음",
             None if p.key != crate::scan::session::ORPHAN_KEY => "확인불가",
@@ -66,14 +79,11 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
             String::new()
         };
 
-        // 상태 낱말("경로없음")이 잘리면 색 없이 상태를 구분할 수 없게 되므로
-        // 이름을 먼저 줄이고 배지와 상태 낱말의 자리는 고정한다.
         const BADGE_W: usize = 7;
         const NOTE_W: usize = 8;
         const GUTTER: usize = 1;
         let name_w = inner.saturating_sub(BADGE_W + NOTE_W + GUTTER).max(6);
         let line = Line::from(vec![
-            // 여백은 이름 밖에 둔다 — 안에 두면 이름이 꽉 찼을 때 배지와 붙는다.
             Span::raw(theme::pad(&p.short_label(), name_w)),
             Span::raw(" ".repeat(GUTTER)),
             Span::styled(
@@ -100,7 +110,7 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(border_style(focused));
 
     let mut state = ListState::default();
-    state.select(Some(app.project_cursor.min(items.len().saturating_sub(1))));
+    state.select(Some(project_row_index(app, &visible)));
     frame.render_stateful_widget(
         List::new(items)
             .block(block)
@@ -113,6 +123,25 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
         area,
         &mut state,
     );
+}
+
+/// 목록에는 에이전트 헤더 줄이 섞여 있다. `project_cursor` 는 프로젝트만
+/// 세므로, 화면에서 몇 번째 줄인지 다시 계산한다.
+fn project_row_index(app: &App, visible: &[usize]) -> usize {
+    let mut row = 0usize;
+    let mut last: Option<&str> = None;
+    for (n, &idx) in visible.iter().enumerate() {
+        let agent = app.result.projects[idx].agent;
+        if last != Some(agent) {
+            last = Some(agent);
+            row += 1;
+        }
+        if n == app.project_cursor {
+            return row;
+        }
+        row += 1;
+    }
+    row.saturating_sub(1)
 }
 
 fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
@@ -130,11 +159,15 @@ fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
     }
 
     // 어느 프로젝트를 보고 있는지 항상 제목에 밝힌다.
-    let project = app
-        .current_project()
-        .map(|p| p.short_label())
-        .unwrap_or_else(|| "—".into());
-    let title = format!(" {project} — 세션 {} ", sessions.len());
+    let (project, agent) = match app.current_project() {
+        Some(p) => (p.short_label(), crate::agents::label_of(p.agent)),
+        None => ("—".to_string(), String::new()),
+    };
+    let title = if agent.is_empty() {
+        format!(" {project} — 세션 {} ", sessions.len())
+    } else {
+        format!(" {agent} · {project} — 세션 {} ", sessions.len())
+    };
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -226,7 +259,7 @@ fn empty_message(app: &App) -> Text<'static> {
     if !app.paths.claude_dir_exists() {
         return Text::from(vec![
             Line::from("  Claude Code 세션을 찾지 못했습니다."),
-            Line::from(format!("  확인한 경로: {}", app.paths.claude_dir.display())),
+            Line::from(format!("  확인한 경로: {}", app.paths.home.display())),
         ]);
     }
     Text::from("  정리할 세션이 없습니다.")

@@ -73,7 +73,20 @@ impl ParsedInfo {
     }
 }
 
+/// 한 줄(JSON 객체)에서 필요한 정보를 뽑아 `ParsedInfo` 에 채우는 함수.
+/// 에이전트마다 기록 형식이 다르므로 이 부분만 갈아끼운다.
+pub type Absorb = dyn Fn(&mut ParsedInfo, &Value) + Sync;
+
+/// Claude Code 형식으로 분석한다.
 pub fn analyze(path: &Path) -> Analysis {
+    analyze_with(path, &absorb_claude)
+}
+
+/// 줄 단위 JSONL 을 관대하게 읽는 공통 골격.
+///
+/// 손상된 줄 무시, 바이트 상한, 조기 중단은 모든 에이전트에 공통이다.
+/// 형식별 차이는 `absorb` 하나로 흡수한다.
+pub fn analyze_with(path: &Path, absorb: &Absorb) -> Analysis {
     let file = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(e) => return Analysis::Unreadable(describe_io_error(&e)),
@@ -138,7 +151,8 @@ fn can_stop(info: &ParsedInfo) -> bool {
     short_rule_settled && display_settled && info.cwd.is_some()
 }
 
-fn absorb(info: &mut ParsedInfo, v: &Value) {
+/// Claude Code 의 기록 형식.
+pub fn absorb_claude(info: &mut ParsedInfo, v: &Value) {
     if info.cwd.is_none()
         && let Some(cwd) = v.get("cwd").and_then(Value::as_str)
         && !cwd.is_empty()
@@ -190,6 +204,19 @@ fn absorb(info: &mut ParsedInfo, v: &Value) {
     }
 }
 
+/// 타임스탬프를 최신값으로 갱신한다.
+pub fn note_timestamp(info: &mut ParsedInfo, secs: i64) {
+    info.last_timestamp = Some(info.last_timestamp.map_or(secs, |p| p.max(secs)));
+}
+
+/// 사용자 턴을 하나 세고, 첫 프롬프트가 비어 있으면 채운다.
+pub fn note_user_turn(info: &mut ParsedInfo, text: &str) {
+    info.user_messages += 1;
+    if info.first_prompt.is_none() && !text.trim().is_empty() {
+        info.first_prompt = Some(clip(text));
+    }
+}
+
 /// 사용자 턴의 표시용 텍스트. 도구 결과만 담긴 줄은 사용자 턴이 아니다.
 ///
 /// Claude Code는 도구 실행 결과도 `type: "user"` 줄로 기록한다. 그것까지
@@ -224,7 +251,7 @@ fn user_text(content: Option<&Value>) -> Option<String> {
 }
 
 /// 표시용으로 개행을 없애고 길이를 자른다. 로그에는 절대 넣지 않는다(PRD §15).
-fn clip(s: &str) -> String {
+pub fn clip(s: &str) -> String {
     let flat = s.split_whitespace().collect::<Vec<_>>().join(" ");
     if flat.chars().count() <= DISPLAY_LEN {
         flat
@@ -234,13 +261,13 @@ fn clip(s: &str) -> String {
     }
 }
 
-fn parse_timestamp(s: &str) -> Option<i64> {
+pub fn parse_timestamp(s: &str) -> Option<i64> {
     chrono::DateTime::parse_from_rfc3339(s)
         .ok()
         .map(|dt| dt.timestamp())
 }
 
-fn describe_io_error(e: &std::io::Error) -> String {
+pub fn describe_io_error(e: &std::io::Error) -> String {
     match e.kind() {
         std::io::ErrorKind::PermissionDenied => "읽기 권한이 없습니다".into(),
         std::io::ErrorKind::NotFound => "파일이 없습니다".into(),

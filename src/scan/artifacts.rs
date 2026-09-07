@@ -90,7 +90,7 @@ pub struct Artifact {
 }
 
 impl Artifact {
-    fn at(path: PathBuf, kind: ArtifactKind) -> Option<Artifact> {
+    pub fn at(path: PathBuf, kind: ArtifactKind) -> Option<Artifact> {
         let meta = std::fs::symlink_metadata(&path).ok()?;
         let fingerprint = Fingerprint::of(&path)?;
         Some(Artifact {

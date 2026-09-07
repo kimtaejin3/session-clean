@@ -241,6 +241,7 @@ mod tests {
 
     fn session(kind: SessionKind) -> Session {
         Session {
+            agent: "claude",
             id: "aaaaaaaa-1111-2222-3333-444444444444".into(),
             project_key: "-w".into(),
             transcript: None,

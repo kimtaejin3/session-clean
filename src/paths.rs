@@ -19,12 +19,25 @@ pub const SIDECAR_DIRS: &[&str] = &[
     "debug",
 ];
 
+/// 에이전트 식별자 -> 홈 디렉터리 기준 상대 경로.
+///
+/// 지원 대상을 늘릴 때 손대는 곳은 여기와 `agents` 모듈 두 곳뿐이다.
+pub const AGENT_DIRS: &[(&str, &str)] = &[
+    ("claude", ".claude"),
+    ("codex", ".codex"),
+    ("gemini", ".gemini"),
+    ("copilot", ".copilot"),
+    ("continue", ".continue"),
+];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Paths {
-    /// Claude Code 로컬 데이터 루트 (`~/.claude`).
-    pub claude_dir: PathBuf,
+    /// 에이전트 데이터가 놓이는 홈 디렉터리.
+    pub home: PathBuf,
     /// sclean 자체 저장소 (`~/Library/Application Support/sclean`).
     pub data_dir: PathBuf,
+    /// `SCLEAN_CLAUDE_DIR` 로 Claude 루트만 따로 지정한 경우.
+    claude_override: Option<PathBuf>,
 }
 
 impl Paths {
@@ -34,41 +47,75 @@ impl Paths {
     pub fn discover() -> anyhow::Result<Paths> {
         let home =
             dirs::home_dir().ok_or_else(|| anyhow::anyhow!("홈 디렉터리를 찾지 못했습니다"))?;
-        let claude_dir = match std::env::var_os("SCLEAN_CLAUDE_DIR") {
+        let home = match std::env::var_os("SCLEAN_HOME") {
             Some(v) => PathBuf::from(v),
-            None => home.join(".claude"),
+            None => home,
         };
         let data_dir = match std::env::var_os("SCLEAN_DATA_DIR") {
             Some(v) => PathBuf::from(v),
             None => default_data_dir(&home),
         };
         Ok(Paths {
-            claude_dir,
+            home,
             data_dir,
+            claude_override: std::env::var_os("SCLEAN_CLAUDE_DIR").map(PathBuf::from),
         })
     }
 
-    pub fn with_roots(claude_dir: PathBuf, data_dir: PathBuf) -> Paths {
+    pub fn with_home(home: PathBuf, data_dir: PathBuf) -> Paths {
         Paths {
-            claude_dir,
+            home,
             data_dir,
+            claude_override: None,
         }
     }
 
+    /// 테스트 호환: Claude 루트를 직접 지정한다.
+    pub fn with_roots(claude_dir: PathBuf, data_dir: PathBuf) -> Paths {
+        let home = claude_dir
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| claude_dir.clone());
+        Paths {
+            home,
+            data_dir,
+            claude_override: Some(claude_dir),
+        }
+    }
+
+    /// 에이전트 데이터 루트. 목록에 없는 식별자는 `~/.<id>` 로 본다.
+    pub fn agent_root(&self, id: &str) -> PathBuf {
+        if id == "claude"
+            && let Some(o) = &self.claude_override
+        {
+            return o.clone();
+        }
+        let dir = AGENT_DIRS
+            .iter()
+            .find(|(k, _)| *k == id)
+            .map(|(_, d)| *d)
+            .unwrap_or(id);
+        self.home.join(dir)
+    }
+
+    pub fn claude_dir(&self) -> PathBuf {
+        self.agent_root("claude")
+    }
+
     pub fn projects_dir(&self) -> PathBuf {
-        self.claude_dir.join("projects")
+        self.claude_dir().join("projects")
     }
 
     pub fn history_file(&self) -> PathBuf {
-        self.claude_dir.join("history.jsonl")
+        self.claude_dir().join("history.jsonl")
     }
 
     pub fn sessions_dir(&self) -> PathBuf {
-        self.claude_dir.join("sessions")
+        self.claude_dir().join("sessions")
     }
 
     pub fn sidecar_dir(&self, name: &str) -> PathBuf {
-        self.claude_dir.join(name)
+        self.claude_dir().join(name)
     }
 
     pub fn config_file(&self) -> PathBuf {
@@ -90,7 +137,7 @@ impl Paths {
 
     /// Claude 데이터 루트가 실제로 존재하는지. 없으면 빈 상태를 보여준다(PRD §14).
     pub fn claude_dir_exists(&self) -> bool {
-        self.claude_dir.is_dir()
+        self.claude_dir().is_dir()
     }
 }
 
@@ -183,7 +230,7 @@ mod tests {
         let p = Paths::with_roots(tmp.path().join("c"), tmp.path().join("d"));
         p.ensure_data_dirs().unwrap();
         assert!(p.trash_dir().is_dir());
-        assert!(!p.claude_dir.exists());
+        assert!(!p.claude_dir().exists());
     }
 
     #[test]

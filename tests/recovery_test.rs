@@ -102,6 +102,7 @@ fn detects_pending_manifest_from_an_interrupted_run() {
     manifest
         .sessions
         .push(sclean::ops::manifest::ManifestSession {
+            agent: "claude".into(),
             session_id: ids[0].clone(),
             project_key: "shop".into(),
             project_path: None,
@@ -151,6 +152,7 @@ fn recover_twice_is_idempotent() {
     manifest
         .sessions
         .push(sclean::ops::manifest::ManifestSession {
+            agent: "claude".into(),
             session_id: ids[0].clone(),
             project_key: "shop".into(),
             project_path: None,
@@ -198,6 +200,7 @@ fn recovery_does_not_overwrite_a_file_that_reappeared() {
     manifest
         .sessions
         .push(sclean::ops::manifest::ManifestSession {
+            agent: "claude".into(),
             session_id: ids[0].clone(),
             project_key: "shop".into(),
             project_path: None,

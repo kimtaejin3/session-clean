@@ -1,4 +1,4 @@
-//! Claude 데이터 스캔.
+//! 에이전트 데이터 스캔.
 //!
 //! PRD §15 성능: 2,000개 세션을 3초 안에. 세션 파일 분석을 rayon으로 병렬화하고,
 //! 각 파일은 판정에 필요한 만큼만 읽는다(`jsonl::analyze`의 조기 중단).
@@ -8,30 +8,20 @@ pub mod artifacts;
 pub mod jsonl;
 pub mod session;
 
-use crate::ops::fsutil;
+use crate::agents::{Agent, SessionSeed};
 use crate::paths::{Paths, decode_project_label};
-use artifacts::{Artifact, PrefixIndex, file_name_of, looks_like_uuid};
+use artifacts::{Artifact, PrefixIndex};
 use jsonl::Analysis;
 use rayon::prelude::*;
-use session::{ORPHAN_KEY, Project, ScanResult, Session, SessionKind};
+use session::{ORPHAN_KEY, Project, ScanResult, Session, SessionKind, UNKNOWN_PROJECT};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 
 pub enum ScanEvent {
     Progress { done: usize, total: usize },
     Done(Box<ScanResult>),
-}
-
-/// 발견 단계에서 찾아낸 트랜스크립트 후보.
-struct Candidate {
-    id: String,
-    project_key: String,
-    transcript: PathBuf,
-    /// `projects/<p>/<uuid>/subagents/` 아래에서 나온 것인가.
-    from_subagents: bool,
 }
 
 pub fn scan(paths: &Paths) -> ScanResult {
@@ -56,46 +46,57 @@ pub fn scan_with_progress(
     on_progress: &(dyn Fn(usize, usize) + Sync),
 ) -> ScanResult {
     let now = now_secs();
-    let mut errors = Vec::new();
+    let errors = Vec::new();
 
-    // PRD §14: Claude 데이터 디렉터리가 없어도 오류가 아니다.
-    let candidates = discover_candidates(paths, &mut errors);
-    let known: HashSet<String> = candidates.iter().map(|c| c.id.clone()).collect();
-    let orphan_keys = artifacts::orphan_session_ids(paths, &known);
-
-    let all_ids: Vec<String> = candidates
-        .iter()
-        .map(|c| c.id.clone())
-        .chain(orphan_keys.iter().cloned())
+    // 설치된 에이전트만 훑는다. 없는 경로는 오류가 아니다 (PRD §14).
+    let agents: Vec<Box<dyn Agent>> = crate::agents::registry()
+        .into_iter()
+        .filter(|a| a.present(paths))
         .collect();
-    let index = Arc::new(PrefixIndex::build(&all_ids));
 
-    let total = candidates.len() + orphan_keys.len();
+    // 에이전트별로 씨앗과 고아 키를 모으고 전체 개수를 먼저 센다.
+    let mut work: Vec<(Vec<SessionSeed>, Vec<String>, PrefixIndex)> = Vec::new();
+    for agent in &agents {
+        let seeds = agent.discover(paths);
+        let known: HashSet<String> = seeds.iter().map(|s| s.id.clone()).collect();
+        let orphans = agent.orphans(paths, &known);
+        let ids: Vec<String> = seeds
+            .iter()
+            .map(|s| s.id.clone())
+            .chain(orphans.iter().cloned())
+            .collect();
+        work.push((seeds, orphans, PrefixIndex::build(&ids)));
+    }
+
+    let total: usize = work.iter().map(|(s, o, _)| s.len() + o.len()).sum();
     let done = AtomicUsize::new(0);
     let bump = |done: &AtomicUsize| {
         let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-        // 진행률 보고는 저렴해야 한다. 매 항목마다 보내되 채널이 흡수한다.
         on_progress(n, total);
     };
 
-    let mut sessions: Vec<Session> = candidates
-        .par_iter()
-        .map(|c| {
-            let s = build_session(paths, c, &index);
-            bump(&done);
-            s
-        })
-        .collect();
+    let mut sessions: Vec<Session> = Vec::new();
+    for (agent, (seeds, orphans, index)) in agents.iter().zip(work.iter()) {
+        let built: Vec<Session> = seeds
+            .par_iter()
+            .map(|seed| {
+                let s = build_session(paths, agent.as_ref(), seed, index);
+                bump(&done);
+                s
+            })
+            .collect();
+        sessions.extend(built);
 
-    let orphans: Vec<Session> = orphan_keys
-        .par_iter()
-        .map(|key| {
-            let s = build_orphan(paths, key);
-            bump(&done);
-            s
-        })
-        .collect();
-    sessions.extend(orphans);
+        let built_orphans: Vec<Session> = orphans
+            .par_iter()
+            .map(|key| {
+                let s = build_orphan(paths, agent.as_ref(), key);
+                bump(&done);
+                s
+            })
+            .collect();
+        sessions.extend(built_orphans);
+    }
 
     ScanResult {
         projects: group(sessions),
@@ -104,83 +105,45 @@ pub fn scan_with_progress(
     }
 }
 
-/// `projects/` 아래를 훑어 세션 트랜스크립트를 모은다. 파일 내용은 읽지 않는다.
-fn discover_candidates(paths: &Paths, errors: &mut Vec<String>) -> Vec<Candidate> {
-    let root = paths.projects_dir();
-    if !root.is_dir() {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    let entries = match std::fs::read_dir(&root) {
-        Ok(e) => e,
-        Err(e) => {
-            errors.push(format!("{} 을(를) 읽을 수 없습니다: {e}", root.display()));
-            return out;
-        }
-    };
-    for entry in entries.flatten() {
-        let dir = entry.path();
-        if !dir.is_dir() {
-            continue;
-        }
-        let key = file_name_of(&dir);
-        collect_transcripts(&dir, &key, false, &mut out);
-        // 세션 폴더 안의 subagents/ 도 세션으로 취급한다 (R4).
-        for child in fsutil::list_dir(&dir) {
-            if child.is_dir() {
-                let sub = child.join("subagents");
-                if sub.is_dir() {
-                    collect_transcripts(&sub, &key, true, &mut out);
-                }
-            }
-        }
-    }
-    out
-}
-
-fn collect_transcripts(dir: &Path, key: &str, from_subagents: bool, out: &mut Vec<Candidate>) {
-    for p in fsutil::list_dir(dir) {
-        if p.extension().and_then(|e| e.to_str()) != Some("jsonl") {
-            continue;
-        }
-        let stem = p
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        if !looks_like_uuid(&stem) {
-            continue;
-        }
-        out.push(Candidate {
-            id: stem,
-            project_key: key.to_string(),
-            transcript: p,
-            from_subagents,
-        });
-    }
-}
-
-fn build_session(paths: &Paths, c: &Candidate, index: &PrefixIndex) -> Session {
-    let analysis = jsonl::analyze(&c.transcript);
-    let (arts, ambiguous) = artifacts::collect_for(paths, &c.id, Some(&c.transcript), index);
+fn build_session(
+    paths: &Paths,
+    agent: &dyn Agent,
+    seed: &SessionSeed,
+    index: &PrefixIndex,
+) -> Session {
+    let analysis = agent.analyze(seed);
+    let (arts, ambiguous) = agent.artifacts(paths, seed, index);
 
     let info = analysis.info();
     let cwd = info.and_then(|i| i.cwd.clone());
     let (project_path, project_exists) = verify_project(cwd);
 
-    let display_name = display_name_for(&c.id, &analysis);
+    // 경로에서 알아낸 키를 우선하고, 없으면 cwd 를 프로젝트 키로 쓴다.
+    let project_key = seed
+        .project_key
+        .clone()
+        .or_else(|| {
+            project_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| UNKNOWN_PROJECT.to_string());
+
+    let display_name = display_name_for(&seed.id, &analysis);
     let last_active_secs = last_active(&arts, info.and_then(|i| i.last_timestamp));
     let size_bytes = arts.iter().map(|a| a.size).sum();
 
-    let kind = if c.from_subagents || info.map(|i| i.is_sidechain).unwrap_or(false) {
+    let kind = if seed.subagent || info.map(|i| i.is_sidechain).unwrap_or(false) {
         SessionKind::Subagent
     } else {
         SessionKind::Normal
     };
 
     Session {
-        id: c.id.clone(),
-        project_key: c.project_key.clone(),
-        transcript: Some(c.transcript.clone()),
+        agent: agent.id(),
+        id: seed.id.clone(),
+        project_key,
+        transcript: Some(seed.transcript.clone()),
         project_path,
         project_exists,
         display_name,
@@ -193,12 +156,13 @@ fn build_session(paths: &Paths, c: &Candidate, index: &PrefixIndex) -> Session {
     }
 }
 
-fn build_orphan(paths: &Paths, key: &str) -> Session {
-    let arts = artifacts::collect_orphan(paths, key);
+fn build_orphan(paths: &Paths, agent: &dyn Agent, key: &str) -> Session {
+    let arts = agent.orphan_artifacts(paths, key);
     let size_bytes = arts.iter().map(|a| a.size).sum();
     let last_active_secs = last_active(&arts, None);
     let short: String = key.chars().take(16).collect();
     Session {
+        agent: agent.id(),
         id: key.to_string(),
         project_key: ORPHAN_KEY.to_string(),
         transcript: None,
@@ -207,7 +171,6 @@ fn build_orphan(paths: &Paths, key: &str) -> Session {
         display_name: format!("남은 데이터 {short}"),
         last_active_secs,
         size_bytes,
-        // 대화 기록이 없으니 분석할 것도 없다 — 규칙은 R5만 적용된다.
         analysis: Analysis::Parsed(jsonl::ParsedInfo::default()),
         kind: SessionKind::Orphan,
         artifacts: arts,
@@ -256,15 +219,23 @@ fn last_active(arts: &[Artifact], timestamp: Option<i64>) -> i64 {
 fn group(sessions: Vec<Session>) -> Vec<Project> {
     let mut projects: Vec<Project> = Vec::new();
     for s in sessions {
-        let idx = match projects.iter().position(|p| p.key == s.project_key) {
+        let idx = match projects
+            .iter()
+            .position(|p| p.key == s.project_key && p.agent == s.agent)
+        {
             Some(i) => i,
             None => {
                 let label = if s.project_key == ORPHAN_KEY {
                     "고아 데이터".to_string()
-                } else {
+                } else if s.project_key == UNKNOWN_PROJECT {
+                    "확인 불가".to_string()
+                } else if s.project_key.starts_with('-') {
                     decode_project_label(&s.project_key)
+                } else {
+                    s.project_key.clone()
                 };
                 projects.push(Project {
+                    agent: s.agent,
                     key: s.project_key.clone(),
                     label,
                     path: None,
@@ -274,7 +245,6 @@ fn group(sessions: Vec<Session>) -> Vec<Project> {
                 projects.len() - 1
             }
         };
-        // 프로젝트의 실제 경로는 이 프로젝트에 속한 세션 중 확인된 첫 값을 쓴다.
         if projects[idx].path.is_none()
             && let Some(p) = &s.project_path
         {
@@ -286,15 +256,24 @@ fn group(sessions: Vec<Session>) -> Vec<Project> {
     }
 
     for p in &mut projects {
-        // 최근 활동 순 — 오래된 것을 아래로 모아 훑기 쉽게 한다.
         p.sessions
             .sort_by_key(|s| std::cmp::Reverse(s.last_active_secs));
     }
-    // 고아 데이터는 항상 마지막, 나머지는 이름순.
+    // 레지스트리 순 -> 고아는 뒤로 -> 이름순.
+    let order: Vec<&'static str> = crate::agents::registry().iter().map(|a| a.id()).collect();
     projects.sort_by(|a, b| {
+        let ai = order
+            .iter()
+            .position(|x| *x == a.agent)
+            .unwrap_or(usize::MAX);
+        let bi = order
+            .iter()
+            .position(|x| *x == b.agent)
+            .unwrap_or(usize::MAX);
         let ao = (a.key == ORPHAN_KEY) as u8;
         let bo = (b.key == ORPHAN_KEY) as u8;
-        ao.cmp(&bo)
+        ai.cmp(&bi)
+            .then(ao.cmp(&bo))
             .then_with(|| a.short_label().cmp(&b.short_label()))
     });
     projects

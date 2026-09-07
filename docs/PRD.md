@@ -58,7 +58,6 @@ v0.1에서는 다음 기능을 제공하지 않는다.
 - 백그라운드 자동 정리 또는 예약 실행
 - 클라우드 동기화, 계정, 팀 협업
 - 네이티브 macOS GUI
-- Codex, OpenCode 등 다른 코딩 에이전트 지원
 - 자동 업데이트와 Homebrew 배포
 - 프로젝트·세션 검색
 - Claude의 공유 paste cache, 전역 plan, telemetry 정리
@@ -170,6 +169,23 @@ Linux에서는 XDG 관례에 따라 `~/.local/share/sclean/config.json`을 쓴�
 | `Q` | 종료 |
 
 현재 화면에서 사용할 수 있는 핵심 조작은 하단에 항상 표시한다. 색상은 상태 구분을 보조할 뿐 유일한 표현 수단으로 사용하지 않는다.
+
+### 8.6 지원 에이전트
+
+세션 하나가 파일 하나인 에이전트만 다룬다. 정리 트랜잭션이 "파일을 옮겼다가
+되돌리는 것"이므로, 세션을 데이터베이스 행으로 저장하는 도구는 범위 밖이다.
+
+| 에이전트 | 저장 위치 | 형식 확인 |
+|---|---|---|
+| Claude Code | `~/.claude/projects/<cwd>/<uuid>.jsonl` | 실제 데이터 |
+| Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | 실제 데이터 |
+| Continue | `~/.continue/sessions/<uuid>.json` | 실제 데이터 |
+| Gemini CLI | `~/.gemini/tmp/<hash>/chats/*.json` | 문서 기준 |
+| Copilot CLI | `~/.copilot/session-state/` | 문서 기준 |
+
+형식을 확인하지 못한 에이전트는 화면에 `(미검증)`으로 표시하고, 파싱에 실패하면
+`분석 불가`로 정리를 차단한다. 각 에이전트의 정리 대상은 자기 데이터 루트 안에
+있는지 검증하므로 한 에이전트의 정리가 다른 에이전트에 미치지 않는다.
 
 ## 9. 자동 추천 규칙
 
@@ -428,7 +444,7 @@ v0.1의 목적은 대규모 수익화가 아니라 실제 반복 수요를 확�
 다음 기능은 사용자 요청이 반복될 때만 검토한다.
 
 - Homebrew 설치와 자동 업데이트 (npm 배포는 v0.1에서 이미 제공한다)
-- Codex 및 OpenCode 세션 지원
+- 세션을 SQLite 에 넣는 에이전트(Cursor, OpenCode, Goose 등) 지원
 - 정리 규칙 프리셋
 - 예약 실행과 알림
 - 네이티브 macOS 앱

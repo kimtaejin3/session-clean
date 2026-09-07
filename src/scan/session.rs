@@ -15,9 +15,13 @@ pub enum SessionKind {
 
 /// 고아 데이터를 모아 보여주는 가상 프로젝트 키.
 pub const ORPHAN_KEY: &str = "__orphan__";
+/// 프로젝트 경로를 알아내지 못한 세션을 모으는 키.
+pub const UNKNOWN_PROJECT: &str = "__unknown__";
 
 #[derive(Clone, Debug)]
 pub struct Session {
+    /// 이 세션을 만든 에이전트 식별자. 정리 대상 경로 검증의 기준이 된다.
+    pub agent: &'static str,
     pub id: String,
     pub project_key: String,
     pub transcript: Option<PathBuf>,
@@ -52,6 +56,7 @@ impl Session {
 
 #[derive(Clone, Debug)]
 pub struct Project {
+    pub agent: &'static str,
     /// `projects/` 아래 디렉터리 이름 또는 `ORPHAN_KEY`.
     pub key: String,
     /// 표시용 전체 경로 문자열.
@@ -66,6 +71,8 @@ impl Project {
     pub fn short_label(&self) -> String {
         if self.key == ORPHAN_KEY {
             "고아 데이터".to_string()
+        } else if self.key == UNKNOWN_PROJECT {
+            "확인 불가".to_string()
         } else {
             crate::paths::short_label(&self.label)
         }
