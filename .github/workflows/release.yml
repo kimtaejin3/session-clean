@@ -47,8 +47,8 @@ jobs:
       - run: cargo build --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
-          name: sclean-${{ matrix.key }}
-          path: target/${{ matrix.target }}/release/sclean
+          name: session-clean-${{ matrix.key }}
+          path: target/${{ matrix.target }}/release/session-clean
           if-no-files-found: error
 
   publish:
@@ -82,7 +82,7 @@ jobs:
       - name: 플랫폼 패키지 조립
         run: |
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            node ./npm/platforms/build.mjs "$key" "artifacts/sclean-$key/sclean" "${{ steps.version.outputs.value }}"
+            node ./npm/platforms/build.mjs "$key" "artifacts/session-clean-$key/session-clean" "${{ steps.version.outputs.value }}"
           done
 
       # 이미 올라간 버전은 건너뛴다. 일부만 성공한 실행을 다시 돌릴 수 있어야 한다.
@@ -118,9 +118,9 @@ jobs:
         run: |
           mkdir -p dist
           for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            chmod +x "artifacts/sclean-$key/sclean"
+            chmod +x "artifacts/session-clean-$key/session-clean"
             tar -czf "dist/session-clean-${{ steps.version.outputs.value }}-$key.tar.gz" \
-              -C "artifacts/sclean-$key" sclean
+              -C "artifacts/session-clean-$key" session-clean
           done
           ls -l dist
 

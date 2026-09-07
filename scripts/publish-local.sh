@@ -34,7 +34,7 @@ rm -rf "$WORK"
 gh run download "$RUN_ID" --dir "$WORK"
 
 for key in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-  binary="$WORK/sclean-$key/sclean"
+  binary="$WORK/session-clean-$key/session-clean"
   if [ ! -f "$binary" ]; then
     echo "빌드 산출물이 없습니다: $binary" >&2
     exit 1
@@ -54,4 +54,4 @@ npm publish "$ROOT/npm/session-clean" --access public
 
 rm -rf "$WORK"
 echo
-echo "완료. 확인:  npx session-clean@$VERSION --version"
+echo "Done. Check:  npx session-clean@$VERSION --version"

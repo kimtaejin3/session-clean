@@ -1,6 +1,6 @@
 {
   "name": "session-clean",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Review and safely clean up the sessions your coding agents leave behind — Claude Code, Codex, Gemini CLI, Copilot CLI and Continue. Local terminal UI, no network.",
   "keywords": [
     "claude",
@@ -23,7 +23,8 @@
   "license": "MIT",
   "author": "kimtaejin3",
   "bin": {
-    "sclean": "bin/sclean.js"
+    "session-clean": "bin/session-clean.js",
+    "sclean": "bin/session-clean.js"
   },
   "files": [
     "bin",
@@ -33,9 +34,9 @@
     "node": ">=16"
   },
   "optionalDependencies": {
-    "session-clean-darwin-arm64": "0.2.1",
-    "session-clean-darwin-x64": "0.2.1",
-    "session-clean-linux-x64": "0.2.1",
-    "session-clean-linux-arm64": "0.2.1"
+    "session-clean-darwin-arm64": "0.3.0",
+    "session-clean-darwin-x64": "0.3.0",
+    "session-clean-linux-x64": "0.3.0",
+    "session-clean-linux-arm64": "0.3.0"
   }
 }

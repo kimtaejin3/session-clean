@@ -44,7 +44,7 @@ impl Drop for TerminalGuard {
 pub fn run(paths: Paths) -> anyhow::Result<()> {
     logging::init(&paths);
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
-        anyhow::bail!("sclean must be run in a terminal (stdout is not a TTY)");
+        anyhow::bail!("session-clean must be run in a terminal (stdout is not a TTY)");
     }
     let _guard = TerminalGuard::enter()?;
     let backend = CrosstermBackend::new(stdout());

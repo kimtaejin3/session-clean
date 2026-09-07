@@ -3,7 +3,7 @@
 //   node npm/platforms/build.mjs <target-key> <binary-path> <version>
 //   예: node npm/platforms/build.mjs darwin-arm64 target/aarch64-apple-darwin/release/sclean 0.1.0
 //
-// 결과: npm/platforms/<target-key>/{package.json,bin/sclean}
+// 결과: npm/platforms/<target-key>/{package.json,bin/session-clean}
 
 import { mkdirSync, copyFileSync, writeFileSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -29,7 +29,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = join(here, key);
 mkdirSync(join(outDir, "bin"), { recursive: true });
 
-const target = join(outDir, "bin", "sclean");
+const target = join(outDir, "bin", "session-clean");
 copyFileSync(binaryPath, target);
 chmodSync(target, 0o755);
 
@@ -39,7 +39,7 @@ writeFileSync(
     {
       name: `session-clean-${key}`,
       version,
-      description: `Native sclean binary for ${key}. Installed automatically by the session-clean package.`,
+      description: `Native session-clean binary for ${key}. Installed automatically by the session-clean package.`,
       license: "MIT",
       repository: {
         type: "git",

@@ -1,4 +1,4 @@
-# sclean
+# session-clean
 
 [![CI](https://github.com/kimtaejin3/session-clean/actions/workflows/ci.yml/badge.svg)](https://github.com/kimtaejin3/session-clean/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/session-clean)](https://www.npmjs.com/package/session-clean)
@@ -34,10 +34,10 @@ That is enough to try it once. To keep it around, install it globally:
 
 ```sh
 npm install -g session-clean
-sclean
+session-clean
 ```
 
-The package is named `session-clean`; the command is **`sclean`**.
+The command is **`session-clean`**. `sclean` is kept as a shorter alias, so anything you already scripted keeps working.
 
 To build from source you need Rust 1.85 or newer (edition 2024):
 
@@ -47,7 +47,7 @@ cargo install --path .
 
 ## Supported agents
 
-sclean only handles agents that store **one session per file**. Its safety model is "move the file to a trash folder, and move it back on restore" — that does not translate to agents which keep sessions as rows in a database (Cursor, OpenCode, Goose, Crush, Amp), so those are out of scope.
+session-clean only handles agents that store **one session per file**. Its safety model is "move the file to a trash folder, and move it back on restore" — that does not translate to agents which keep sessions as rows in a database (Cursor, OpenCode, Goose, Crush, Amp), so those are out of scope.
 
 | Agent | Location | Format confirmed |
 |---|---|---|
@@ -57,7 +57,7 @@ sclean only handles agents that store **one session per file**. Its safety model
 | Gemini CLI | `~/.gemini/tmp/<hash>/chats/*.json` | from documentation |
 | Copilot CLI | `~/.copilot/session-state/` | from documentation |
 
-The two agents whose format was only taken from documentation are labelled `(미검증)` — *unverified* — in the interface. If their real format differs, their sessions are marked unparseable and **cleanup is refused**: sclean does nothing rather than delete the wrong thing.
+The two agents whose format was only taken from documentation are labelled `(미검증)` — *unverified* — in the interface. If their real format differs, their sessions are marked unparseable and **cleanup is refused**: session-clean does nothing rather than delete the wrong thing.
 
 Agents you do not have installed are skipped silently. Every target path is checked against its own agent's data directory, so cleaning one agent can never touch another's files.
 
@@ -69,14 +69,14 @@ Agents you do not have installed are skipped silently. Every target path is chec
 | Linux x64 / arm64 | supported |
 | Windows | not supported natively — **use WSL** |
 
-Windows builds fail because sclean uses Unix-only filesystem APIs (symlinks, process signals). If you run your coding agents inside WSL, their data lives in WSL too and the Linux build works as-is.
+Windows builds fail because session-clean uses Unix-only filesystem APIs (symlinks, process signals). If you run your coding agents inside WSL, their data lives in WSL too and the Linux build works as-is.
 
-Settings and the trash folder live in `~/Library/Application Support/sclean` on macOS and `~/.local/share/sclean` on Linux.
+Settings and the trash folder live in `~/Library/Application Support/sclean` on macOS and `~/.local/share/sclean` on Linux. Those directory names keep the older `sclean` spelling so that upgrades do not lose your trash.
 
 ## Running it
 
 ```sh
-sclean
+session-clean
 ```
 
 There are no flags. Selecting sessions, changing the criteria, moving to trash, deleting permanently, and restoring all happen inside the TUI.
@@ -151,7 +151,7 @@ Only paths that actually exist are read; a missing one is not an error.
 ~/.copilot/session-state/                      transcript
 ```
 
-sclean writes to exactly one place:
+session-clean writes to exactly one place:
 
 ```text
 ~/Library/Application Support/sclean/   (Linux: ~/.local/share/sclean/)
@@ -175,7 +175,7 @@ Your project source files are **never read or written**, only checked for existe
 ## Development
 
 ```sh
-cargo test                       # 212 tests
+cargo test                       # 213 tests
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 cargo test --release --test perf_test -- --nocapture   # scan time for 2,000 sessions
@@ -184,7 +184,7 @@ cargo test --release --test perf_test -- --nocapture   # scan time for 2,000 ses
 Tests never touch your real agent directories; they build fixtures in a temporary directory. To point a real run somewhere else:
 
 ```sh
-SCLEAN_HOME=/tmp/fake-home SCLEAN_DATA_DIR=/tmp/fake-sclean sclean
+SCLEAN_HOME=/tmp/fake-home SCLEAN_DATA_DIR=/tmp/fake-sclean session-clean
 ```
 
 To eyeball the layout, print the rendered screens:
@@ -202,7 +202,7 @@ Implement `agents::Agent` — the adapter only needs to find session files, pars
 npm carries prebuilt native binaries, one package per platform, and a thin JS launcher picks the one matching `os`/`cpu`.
 
 ```text
-session-clean                      what users install (bin/sclean.js launcher)
+session-clean                      what users install (bin/session-clean.js launcher)
 ├── session-clean-darwin-arm64     optionalDependencies — npm installs only the match
 ├── session-clean-darwin-x64
 ├── session-clean-linux-x64

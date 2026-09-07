@@ -10,10 +10,10 @@ fn main() {
     if let Some(arg) = std::env::args().nth(1) {
         match arg.as_str() {
             "-h" | "--help" => return print_help(),
-            "-V" | "--version" => return println!("sclean {}", env!("CARGO_PKG_VERSION")),
+            "-V" | "--version" => return println!("session-clean {}", env!("CARGO_PKG_VERSION")),
             other => {
                 eprintln!("unknown argument: {other}");
-                eprintln!("Run `sclean --help` for usage.");
+                eprintln!("Run `session-clean --help` for usage.");
                 std::process::exit(2);
             }
         }
@@ -51,12 +51,14 @@ fn main() {
 
 fn print_help() {
     println!(
-        "sclean {} — clean up the sessions your coding agents leave behind
+        "session-clean {} — clean up the sessions your coding agents leave behind
 
 USAGE
-  sclean              open the terminal UI
-  sclean --help       this help
-  sclean --version    version
+  session-clean              open the terminal UI
+  session-clean --help       this help
+  session-clean --version    version
+
+  `sclean` also works, as a shorter alias.
 
 KEYS
   \u{2191} \u{2193} move   \u{2192} sessions   \u{2190} projects   Space select

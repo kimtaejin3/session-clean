@@ -1,6 +1,6 @@
 [package]
 name = "sclean"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 description = "Review and safely clean up the sessions your coding agents leave behind — Claude Code, Codex, Gemini CLI, Copilot CLI and Continue. Local terminal UI, no network."
@@ -23,7 +23,7 @@ serde_json = "1.0.151"
 tempfile = "3.27.0"
 
 [[bin]]
-name = "sclean"
+name = "session-clean"
 path = "src/main.rs"
 
 [profile.release]
