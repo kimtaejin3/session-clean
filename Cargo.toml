@@ -3,7 +3,7 @@ name = "sclean"
 version = "0.2.0"
 edition = "2024"
 license = "MIT"
-description = "여러 코딩 에이전트의 세션을 규칙 기반 추천으로 안전하게 정리하는 로컬 터미널 UI"
+description = "Review and safely clean up the sessions your coding agents leave behind — Claude Code, Codex, Gemini CLI, Copilot CLI and Continue. Local terminal UI, no network."
 repository = "https://github.com/kimtaejin3/session-clean"
 
 [dependencies]

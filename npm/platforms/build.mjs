@@ -39,7 +39,7 @@ writeFileSync(
     {
       name: `session-clean-${key}`,
       version,
-      description: `sclean native binary for ${key}`,
+      description: `Native sclean binary for ${key}. Installed automatically by the session-clean package.`,
       license: "MIT",
       repository: {
         type: "git",
