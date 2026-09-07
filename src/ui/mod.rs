@@ -44,7 +44,7 @@ impl Drop for TerminalGuard {
 pub fn run(paths: Paths) -> anyhow::Result<()> {
     logging::init(&paths);
     if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
-        anyhow::bail!("sclean은 터미널에서 직접 실행해야 합니다 (표준 출력이 터미널이 아닙니다)");
+        anyhow::bail!("sclean must be run in a terminal (stdout is not a TTY)");
     }
     let _guard = TerminalGuard::enter()?;
     let backend = CrosstermBackend::new(stdout());
@@ -173,7 +173,7 @@ fn confirm_key(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => {
             app.screen = Screen::Sessions;
-            app.status = "정리를 취소했습니다".into();
+            app.status = "Cleanup cancelled".into();
         }
         KeyCode::Enter => app.run_cleanup(),
         // 방식 전환은 글자가 아닌 키로만 한다.

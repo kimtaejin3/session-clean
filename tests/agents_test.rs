@@ -166,7 +166,7 @@ fn an_unreadable_session_from_any_agent_is_blocked() {
     let s = result.sessions().next().unwrap();
     let v = evaluate(s, &Config::default(), now_secs(), &LiveSessions::empty());
     assert!(!v.cleanable(), "형식을 모르면 지우지 않는다");
-    assert!(s.display_name.starts_with("분석 불가"));
+    assert!(s.display_name.starts_with("Unparseable"));
 }
 
 #[test]
@@ -261,7 +261,10 @@ fn a_target_outside_its_own_agent_root_is_refused() {
 
     let err = execute(&paths, targets, CleanupMode::Trash, &LiveSessions::empty())
         .expect_err("자기 에이전트 루트 밖은 거부해야 한다");
-    assert!(format!("{err:#}").contains("안전 검증 실패"), "{err:#}");
+    assert!(
+        format!("{err:#}").contains("safety check failed"),
+        "{err:#}"
+    );
     assert!(intruder.exists());
 }
 

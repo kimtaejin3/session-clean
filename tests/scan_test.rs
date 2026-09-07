@@ -66,7 +66,7 @@ fn corrupted_session_is_listed_but_marked_unanalyzable() {
         .unwrap();
     assert!(matches!(s.analysis, Analysis::Unreadable(_)));
     assert!(
-        s.display_name.starts_with("분석 불가"),
+        s.display_name.starts_with("Unparseable"),
         "안전하게 표시해야 한다: {}",
         s.display_name
     );
@@ -166,7 +166,7 @@ fn orphan_artifacts_appear_as_orphan_sessions() {
     );
     assert_eq!(
         orphans.short_label(),
-        "고아 데이터",
+        "Orphaned data",
         "고아 그룹은 이름으로 구분된다"
     );
 }

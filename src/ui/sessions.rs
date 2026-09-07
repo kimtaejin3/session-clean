@@ -55,7 +55,7 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
             last_agent = Some(p.agent);
             let mut title = crate::agents::label_of(p.agent);
             if !crate::agents::verified_id(p.agent) {
-                title.push_str(" (미검증)");
+                title.push_str(" (unverified)");
             }
             items.push(ListItem::new(Line::from(Span::styled(
                 theme::fit(&format!("── {title}"), inner + 2),
@@ -67,14 +67,14 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
         let selected = app.selected_in(p);
 
         let note = match p.exists {
-            Some(false) => "경로없음",
-            None if p.key != crate::scan::session::ORPHAN_KEY => "확인불가",
+            Some(false) => "missing",
+            None if p.key != crate::scan::session::ORPHAN_KEY => "unknown",
             _ => "",
         };
         let badge = if selected > 0 {
-            format!("선택 {selected}")
+            format!("{selected} sel")
         } else if recommended > 0 {
-            format!("추천 {recommended}")
+            format!("{recommended} sugg")
         } else {
             String::new()
         };
@@ -96,7 +96,7 @@ fn render_projects(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     if items.is_empty() {
-        items.push(ListItem::new("  프로젝트 없음"));
+        items.push(ListItem::new("  No projects"));
     }
 
     let title = format!(
@@ -164,9 +164,12 @@ fn render_sessions(frame: &mut Frame, app: &App, area: Rect, cfg: &Layout2) {
         None => ("—".to_string(), String::new()),
     };
     let title = if agent.is_empty() {
-        format!(" {project} — 세션 {} ", sessions.len())
+        format!(" {project} — {} ", theme::count(sessions.len(), "session"))
     } else {
-        format!(" {agent} · {project} — 세션 {} ", sessions.len())
+        format!(
+            " {agent} · {project} — {} ",
+            theme::count(sessions.len(), "session")
+        )
     };
 
     let block = Block::default()
@@ -258,11 +261,11 @@ fn session_item<'a>(app: &'a App, id: &str, width: usize, cfg: &Layout2) -> List
 fn empty_message(app: &App) -> Text<'static> {
     if !app.paths.claude_dir_exists() {
         return Text::from(vec![
-            Line::from("  Claude Code 세션을 찾지 못했습니다."),
-            Line::from(format!("  확인한 경로: {}", app.paths.home.display())),
+            Line::from("  No coding agent sessions were found."),
+            Line::from(format!("  Looked under: {}", app.paths.home.display())),
         ]);
     }
-    Text::from("  정리할 세션이 없습니다.")
+    Text::from("  Nothing to clean up.")
 }
 
 fn border_style(focused: bool) -> Style {
@@ -279,14 +282,14 @@ pub fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
 
     let status = match &app.scan_state {
         crate::ui::app::ScanState::Scanning { done, total } if *total > 0 => {
-            format!(" 스캔 중 {done} / {total}")
+            format!(" Scanning {done} / {total}")
         }
-        crate::ui::app::ScanState::Scanning { .. } => " 스캔 중…".to_string(),
+        crate::ui::app::ScanState::Scanning { .. } => " Scanning…".to_string(),
         crate::ui::app::ScanState::Ready => {
             let n = app.selected.len();
             if n > 0 {
                 format!(
-                    " {} · 선택 {n}개 ({})",
+                    " {} · {n} selected ({})",
                     app.status,
                     human_bytes(app.total_selected_bytes())
                 )
@@ -305,20 +308,20 @@ pub fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     // 들어가는 것 중 가장 자세한 것을 쓴다. 마지막 것은 최소 폭(50)에서도 들어간다.
     let full = match app.focus {
         Focus::Projects => {
-            " ↑↓ 프로젝트  → 세션 보기  Space 전체선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료"
+            " ↑↓ projects  → sessions  Space select all  A suggested  D clean  T trash  F rules  ? help  Q quit"
         }
         Focus::Sessions => {
-            " ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료"
+            " ↑↓ sessions  ← projects  Space select  A suggested  D clean  T trash  F rules  ? help  Q quit"
         }
     };
     let keys = [
         full,
-        " ↑↓ 이동  ←→ 패널  Space 선택  A 추천  D 정리  T 휴지통  ? 도움말  Q 종료",
-        " ↑↓←→ 이동  Space 선택  A 추천  D 정리  ? 도움말",
+        " ↑↓ move  ←→ pane  Space select  A suggested  D clean  T trash  ? help  Q quit",
+        " ↑↓←→ move  Space select  D clean  ? help",
     ]
     .into_iter()
     .find(|k| theme::display_width(k) <= area.width as usize)
-    .unwrap_or(" ? 도움말  Q 종료");
+    .unwrap_or(" ? help  Q quit");
     frame.render_widget(
         Paragraph::new(theme::fit(keys, area.width as usize)).style(Style::default().fg(MUTED)),
         rows[1],
@@ -335,11 +338,11 @@ mod tests {
         assert!(layout_for(120).side_by_side);
 
         let medium = layout_for(80);
-        assert!(!medium.show_size, "크기 열이 먼저 접힌다");
-        assert!(medium.side_by_side, "두 패널은 아직 나란히");
+        assert!(!medium.show_size, "the size column folds first");
+        assert!(medium.side_by_side, "both panes still fit");
 
         let narrow = layout_for(60);
         assert!(!narrow.show_size);
-        assert!(!narrow.side_by_side, "그다음 한 번에 한 패널만 보여준다");
+        assert!(!narrow.side_by_side, "then only one pane at a time");
     }
 }

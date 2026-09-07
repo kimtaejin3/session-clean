@@ -99,18 +99,18 @@ fn sessions_screen_shows_names_reasons_and_keys() {
     // 왼쪽: 프로젝트 목록과 프로젝트별 추천 수.
     assert!(out.contains("Projects"), "{out}");
     assert!(out.contains("shop-api"));
-    assert!(out.contains("추천 1"));
+    assert!(out.contains("1 sugg"));
     // 오른쪽: 고른 프로젝트의 세션만.
     assert!(out.contains("로그인 수정"), "세션 이름이 보여야 한다");
-    assert!(out.contains("마지막 활동 후"), "추천 이유가 보여야 한다");
+    assert!(out.contains("last active"), "추천 이유가 보여야 한다");
     assert!(out.contains("[ ]"), "선택 상태를 기호로 표시");
     assert!(out.contains("★"), "추천을 기호로 표시");
     assert!(out.contains("Trash: 0"));
     assert!(
-        out.contains("→ 세션 보기"),
+        out.contains("→ sessions"),
         "지금 할 수 있는 조작을 안내한다"
     );
-    assert!(out.contains("아무것도 선택되지 않음"));
+    assert!(out.contains("nothing selected"));
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn the_focused_pane_is_marked_without_relying_on_colour() {
         "커서가 있는 세션은 기호로 드러난다:\n{on_sessions}"
     );
     assert!(
-        on_sessions.contains("← 프로젝트로"),
+        on_sessions.contains("← projects"),
         "돌아가는 방법을 안내한다"
     );
 }
@@ -182,7 +182,7 @@ fn selecting_a_session_changes_its_visible_mark() {
     app.toggle_all_recommended();
     let out = draw(&app, 110, 24, Screen::Sessions);
     assert!(out.contains("[x]"), "선택은 색이 아니라 기호로 드러난다");
-    assert!(out.contains("선택 1개"));
+    assert!(out.contains("1 selected"));
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn too_small_terminal_shows_guidance_only() {
     seeded(&f);
     let app = ready_app(&f);
     let out = draw(&app, 40, 8, Screen::Sessions);
-    assert!(out.contains("너무 작습니다"));
+    assert!(out.contains("too small"));
     assert!(out.contains("50"));
     assert!(!out.contains("로그인 수정"), "데이터를 그리지 않는다");
 }
@@ -239,12 +239,12 @@ fn confirm_modal_shows_counts_size_and_both_modes() {
     app.open_confirm();
     let out = draw(&app, 110, 26, Screen::Confirm);
 
-    assert!(out.contains("정리 확인"));
-    assert!(out.contains("세션 1개"));
-    assert!(out.contains("예상 정리 용량"));
-    assert!(out.contains("휴지통 이동"));
-    assert!(out.contains("완전 삭제"));
-    assert!(out.contains("Enter 실행"));
+    assert!(out.contains("Confirm cleanup"));
+    assert!(out.contains("1 session"));
+    assert!(out.contains("freed"));
+    assert!(out.contains("Move to trash"));
+    assert!(out.contains("Delete permanently"));
+    assert!(out.contains("Enter to run"));
 }
 
 #[test]
@@ -256,10 +256,10 @@ fn permanent_mode_demands_the_delete_word_on_screen() {
     app.open_confirm();
     app.set_mode(sclean::ops::manifest::CleanupMode::Permanent);
     let out = draw(&app, 110, 26, Screen::Confirm);
-    assert!(out.contains("완전 삭제 확인"));
+    assert!(out.contains("Confirm permanent deletion"));
     assert!(out.contains("DELETE"));
     assert!(
-        !out.contains("Enter 실행"),
+        !out.contains("Enter to run"),
         "입력 전에는 실행을 안내하지 않는다"
     );
 }
@@ -274,9 +274,9 @@ fn result_screen_separates_success_skipped_and_failed() {
     app.run_cleanup();
     let out = draw(&app, 110, 26, Screen::Result);
 
-    assert!(out.contains("정리 결과"));
-    assert!(out.contains("성공 1"));
-    assert!(out.contains("로그:"), "FR-18: 로그 경로를 보여준다");
+    assert!(out.contains("Cleanup result"));
+    assert!(out.contains("1 succeeded"));
+    assert!(out.contains("Log:"), "FR-18: 로그 경로를 보여준다");
 }
 
 #[test]
@@ -291,15 +291,15 @@ fn trash_screen_lists_operations_and_sessions() {
 
     let out = draw(&app, 110, 24, Screen::Trash);
     assert!(out.contains("Trash"));
-    assert!(out.contains("휴지통 이동"));
+    assert!(out.contains("Move to trash"));
     assert!(out.contains("로그인 수정"));
-    assert!(out.contains("R 복원"));
-    assert!(out.contains("X 영구 삭제"));
+    assert!(out.contains("R restore"));
+    assert!(out.contains("X delete permanently"));
 
     let detail = draw(&app, 110, 24, Screen::TrashDetail);
-    assert!(detail.contains("휴지통 상세"));
+    assert!(detail.contains("Trash details"));
     assert!(
-        detail.contains("마지막 활동 후"),
+        detail.contains("last active"),
         "정리한 이유를 보관·표시한다"
     );
 }
@@ -311,12 +311,12 @@ fn filters_screen_shows_every_rule_and_the_threshold() {
     let app = ready_app(&f);
     let out = draw(&app, 110, 26, Screen::Filters);
 
-    assert!(out.contains("추천 기준"));
-    assert!(out.contains("오래됨 기준: 30일"));
-    assert!(out.contains("짧은 세션 추천"));
-    assert!(out.contains("종료된 하위 에이전트 추천"));
-    assert!(out.contains("존재하지 않는 프로젝트 추천"));
-    assert!(out.contains("고아 데이터 추천"));
+    assert!(out.contains("Suggestion criteria"));
+    assert!(out.contains("Older than 30 days"));
+    assert!(out.contains("Suggest short sessions"));
+    assert!(out.contains("Suggest finished subagents"));
+    assert!(out.contains("Suggest sessions of missing projects"));
+    assert!(out.contains("Suggest orphaned data"));
     assert!(out.contains("config.json"), "저장 위치를 밝힌다");
 }
 
@@ -326,11 +326,11 @@ fn help_screen_lists_keys_and_safety_policy() {
     seeded(&f);
     let app = ready_app(&f);
     let out = draw(&app, 110, 30, Screen::Help);
-    assert!(out.contains("도움말"));
-    assert!(out.contains("추천 항목 전체"));
-    assert!(out.contains("안전 정책"));
-    assert!(out.contains("덮어쓰지 않습니다"));
-    assert!(out.contains("네트워크"));
+    assert!(out.contains("Help"));
+    assert!(out.contains("every suggested session"));
+    assert!(out.contains("Safety"));
+    assert!(out.contains("never overwrites"));
+    assert!(out.contains("No network"));
 }
 
 #[test]
@@ -338,8 +338,8 @@ fn empty_state_explains_where_it_looked() {
     let f = Fixture::bare();
     let app = ready_app(&f);
     let out = draw(&app, 110, 20, Screen::Sessions);
-    assert!(out.contains("Claude Code 세션을 찾지 못했"), "{out}");
-    assert!(out.contains("확인한 경로"));
+    assert!(out.contains("No coding agent sessions were found"), "{out}");
+    assert!(out.contains("Looked under"));
 }
 
 #[test]
@@ -353,7 +353,7 @@ fn unparsable_session_is_shown_but_marked_blocked() {
     let app = ready_app(&f);
     let out = draw(&app, 110, 20, Screen::Sessions);
 
-    assert!(out.contains("분석 불가"), "안전하게 표시한다 (FR-15)");
+    assert!(out.contains("Unparseable"), "안전하게 표시한다 (FR-15)");
     assert!(out.contains("[-]"), "정리 불가는 기호로 구분된다");
     assert!(!out.contains("[x]"));
 }
@@ -368,7 +368,7 @@ fn scan_progress_is_visible_while_scanning() {
         total: 2000,
     });
     let out = draw(&app, 110, 20, Screen::Sessions);
-    assert!(out.contains("스캔 중 1203 / 2000"), "{out}");
+    assert!(out.contains("Scanning 1203 / 2000"), "{out}");
 }
 
 #[test]
@@ -384,9 +384,9 @@ fn recovery_modal_explains_what_will_happen() {
     app.pending_ops = sclean::ops::trash::list(&f.paths());
 
     let out = draw(&app, 110, 24, Screen::Recovery);
-    assert!(out.contains("중단된 작업 복구"));
-    assert!(out.contains("덮어쓰지 않고"));
-    assert!(out.contains("R 복구"));
+    assert!(out.contains("Recover unfinished cleanup"));
+    assert!(out.contains("skipped rather than overwritten"));
+    assert!(out.contains("R recover"));
 }
 
 #[test]

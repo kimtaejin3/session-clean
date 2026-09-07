@@ -42,7 +42,7 @@ fn r1_old_session_is_recommended_with_an_explanation() {
     let v = verdict_for(&f, &Config::default(), &id);
     assert!(v.recommended());
     assert!(matches!(v.reasons[0], Reason::Old { days } if (91..=93).contains(&days)));
-    assert!(v.label().contains("마지막 활동 후"));
+    assert!(v.label().contains("last active"));
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn r5_orphan_data_matches() {
             .iter()
             .any(|r| matches!(r, Reason::OrphanData { .. }))
     );
-    assert!(v.label().contains("대화 기록 없이 남은 데이터"));
+    assert!(v.label().contains("data left behind with no transcript"));
 }
 
 #[test]

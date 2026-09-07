@@ -40,8 +40,8 @@ pub enum CleanupMode {
 impl CleanupMode {
     pub fn label(&self) -> &'static str {
         match self {
-            CleanupMode::Trash => "휴지통 이동",
-            CleanupMode::Permanent => "완전 삭제",
+            CleanupMode::Trash => "Move to trash",
+            CleanupMode::Permanent => "Delete permanently",
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "sclean"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 description = "Review and safely clean up the sessions your coding agents leave behind — Claude Code, Codex, Gemini CLI, Copilot CLI and Continue. Local terminal UI, no network."

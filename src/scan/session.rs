@@ -70,9 +70,9 @@ pub struct Project {
 impl Project {
     pub fn short_label(&self) -> String {
         if self.key == ORPHAN_KEY {
-            "고아 데이터".to_string()
+            "Orphaned data".to_string()
         } else if self.key == UNKNOWN_PROJECT {
-            "확인 불가".to_string()
+            "Unknown project".to_string()
         } else {
             crate::paths::short_label(&self.label)
         }

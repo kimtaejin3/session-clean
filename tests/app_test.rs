@@ -59,7 +59,7 @@ fn nothing_is_selected_after_scan() {
         app.selected.is_empty(),
         "PRD §6: 추천 세션을 자동 선택하지 않는다"
     );
-    assert!(app.status.contains("아무것도 선택되지 않음"));
+    assert!(app.status.contains("nothing selected"));
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn toggle_all_recommended_spans_every_project() {
     assert!(app.selected.contains(&old_a));
     assert!(app.selected.contains(&old_b));
     assert!(!app.selected.contains(&fresh));
-    assert!(app.status.contains("프로젝트 2개"), "{}", app.status);
+    assert!(app.status.contains("across 2 project"), "{}", app.status);
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn blocked_sessions_cannot_be_selected() {
 
     app.toggle_session(&id);
     assert!(app.selected.is_empty());
-    assert!(app.status.contains("분석할 수 없어"), "{}", app.status);
+    assert!(app.status.contains("could not be parsed"), "{}", app.status);
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn opening_confirm_without_a_selection_is_refused() {
     let mut app = ready_app(&f);
     app.open_confirm();
     assert_eq!(app.screen, Screen::Sessions);
-    assert!(app.status.contains("선택된 세션이 없습니다"));
+    assert!(app.status.contains("No sessions selected"));
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn trash_screen_groups_by_operation_and_restores() {
     // 커서가 작업 헤더에 있을 때 복원하면 작업 전체가 돌아온다.
     app.trash_cursor = 0;
     app.restore_selection();
-    assert!(app.status.contains("복원"), "{}", app.status);
+    assert!(app.status.contains("Restored"), "{}", app.status);
     assert_eq!(scan(&f.paths()).session_count(), 3);
     assert!(app.trash_ops.is_empty());
 }
@@ -370,7 +370,7 @@ fn trash_screen_can_purge_permanently() {
     app.trash_cursor = 0;
     app.purge_selection();
     assert!(app.trash_ops.is_empty());
-    assert!(app.status.contains("영구 삭제"));
+    assert!(app.status.contains("Permanently deleted"));
     assert_eq!(
         scan(&f.paths()).session_count(),
         1,

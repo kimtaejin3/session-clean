@@ -135,7 +135,7 @@ pub fn analyze_with(path: &Path, absorb: &Absorb) -> Analysis {
     }
 
     if !parsed_any {
-        return Analysis::Unreadable("이해할 수 있는 JSONL 줄이 없습니다".into());
+        return Analysis::Unreadable("no readable JSONL lines".into());
     }
     if info.broken_lines > 0 {
         Analysis::Partial(info)
@@ -269,9 +269,9 @@ pub fn parse_timestamp(s: &str) -> Option<i64> {
 
 pub fn describe_io_error(e: &std::io::Error) -> String {
     match e.kind() {
-        std::io::ErrorKind::PermissionDenied => "읽기 권한이 없습니다".into(),
-        std::io::ErrorKind::NotFound => "파일이 없습니다".into(),
-        _ => format!("읽기 실패: {e}"),
+        std::io::ErrorKind::PermissionDenied => "no permission to read".into(),
+        std::io::ErrorKind::NotFound => "file not found".into(),
+        _ => format!("read failed: {e}"),
     }
 }
 

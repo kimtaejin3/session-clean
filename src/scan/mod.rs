@@ -168,7 +168,7 @@ fn build_orphan(paths: &Paths, agent: &dyn Agent, key: &str) -> Session {
         transcript: None,
         project_path: None,
         project_exists: None,
-        display_name: format!("남은 데이터 {short}"),
+        display_name: format!("Leftover data {short}"),
         last_active_secs,
         size_bytes,
         analysis: Analysis::Parsed(jsonl::ParsedInfo::default()),
@@ -194,7 +194,7 @@ fn verify_project(cwd: Option<PathBuf>) -> (Option<PathBuf>, Option<bool>) {
 fn display_name_for(id: &str, analysis: &Analysis) -> String {
     let short: String = id.chars().take(8).collect();
     match analysis {
-        Analysis::Unreadable(_) => format!("분석 불가 {short}"),
+        Analysis::Unreadable(_) => format!("Unparseable {short}"),
         _ => analysis
             .info()
             .and_then(|i| {
@@ -203,7 +203,7 @@ fn display_name_for(id: &str, analysis: &Analysis) -> String {
                     .or_else(|| i.first_prompt.clone())
                     .filter(|s| !s.trim().is_empty())
             })
-            .unwrap_or_else(|| format!("제목 없음 {short}")),
+            .unwrap_or_else(|| format!("Untitled {short}")),
     }
 }
 
@@ -226,9 +226,9 @@ fn group(sessions: Vec<Session>) -> Vec<Project> {
             Some(i) => i,
             None => {
                 let label = if s.project_key == ORPHAN_KEY {
-                    "고아 데이터".to_string()
+                    "Orphaned data".to_string()
                 } else if s.project_key == UNKNOWN_PROJECT {
-                    "확인 불가".to_string()
+                    "Unknown project".to_string()
                 } else if s.project_key.starts_with('-') {
                     decode_project_label(&s.project_key)
                 } else {

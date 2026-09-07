@@ -3,7 +3,7 @@
 use crate::ops::fsutil::human_bytes;
 use crate::ui::app::App;
 use crate::ui::modals::centered;
-use crate::ui::theme::*;
+use crate::ui::theme::{self, *};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 
@@ -28,10 +28,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::raw(format!(
-                "  {} · 세션 {}개 · 파일 {}개 · {}",
+                "  {} · {} · {} · {}",
                 op.manifest.mode.label(),
-                op.session_count(),
-                op.manifest.total_files(),
+                theme::count(op.session_count(), "session"),
+                theme::count(op.manifest.total_files(), "file"),
                 human_bytes(op.bytes())
             )),
         ])));
@@ -56,15 +56,15 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     if items.is_empty() {
-        items.push(ListItem::new("  휴지통이 비어 있습니다."));
+        items.push(ListItem::new("  The trash is empty."));
     }
 
     let total = human_bytes(crate::ops::trash::total_bytes(&app.trash_ops));
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(
-            " Trash — 세션 {}개 · {total} ",
-            app.trash_total_sessions()
+            " Trash — {} · {total} ",
+            theme::count(app.trash_total_sessions(), "session")
         ))
         .border_style(Style::default().fg(ACCENT));
 
@@ -84,7 +84,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         footer[0],
     );
     frame.render_widget(
-        Paragraph::new(" Space 선택  R 복원  X 영구 삭제  Enter 상세  Esc 돌아가기")
+        Paragraph::new(" Space select  R restore  X delete permanently  Enter details  Esc back")
             .style(Style::default().fg(MUTED)),
         footer[1],
     );
@@ -122,11 +122,11 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(ACCENT),
         ));
         if let Some(p) = &s.project_path {
-            lines.push(Line::from(format!("  프로젝트: {p}")));
+            lines.push(Line::from(format!("  Project: {p}")));
         }
         if !s.reasons.is_empty() {
             lines.push(Line::styled(
-                format!("  이유: {}", s.reasons.join(" · ")),
+                format!("  Reason: {}", s.reasons.join(" · ")),
                 Style::default().fg(RECOMMEND),
             ));
         }
@@ -138,20 +138,23 @@ pub fn render_detail(frame: &mut Frame, app: &App, area: Rect) {
         }
         if !s.shared.is_empty() {
             lines.push(Line::styled(
-                format!("  · 공유 기록 {}줄", s.shared.len()),
+                format!(
+                    "  · {} of shared record",
+                    theme::count(s.shared.len(), "line")
+                ),
                 Style::default().fg(MUTED),
             ));
         }
         lines.push(Line::from(""));
     }
-    lines.push(Line::styled("Esc 닫기", Style::default().fg(MUTED)));
+    lines.push(Line::styled("Esc to close", Style::default().fg(MUTED)));
 
     frame.render_widget(
         Paragraph::new(lines)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" 휴지통 상세 ")
+                    .title(" Trash details ")
                     .border_style(Style::default().fg(ACCENT)),
             )
             .wrap(Wrap { trim: false }),

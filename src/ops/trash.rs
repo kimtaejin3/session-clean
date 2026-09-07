@@ -95,7 +95,7 @@ pub fn restore(
 ) -> Result<RestoreOutcome> {
     let dir = Manifest::op_dir(paths, op_id);
     let mut manifest = Manifest::load(&dir)
-        .with_context(|| format!("작업 기록을 읽지 못했습니다: {}", dir.display()))?;
+        .with_context(|| format!("could not read the operation record: {}", dir.display()))?;
     let mut outcome = RestoreOutcome::default();
     let mut remaining: Vec<ManifestSession> = Vec::new();
 
@@ -153,7 +153,7 @@ fn restore_session(
                 all_ok = false;
                 outcome.failed.push((
                     session.display_name.clone(),
-                    format!("{} 없음", file.stored),
+                    format!("{} is missing", file.stored),
                 ));
             }
             continue;
@@ -172,7 +172,7 @@ fn restore_session(
             all_ok = false;
             outcome.failed.push((
                 session.display_name.clone(),
-                format!("안전 검증 실패: {}", original.display()),
+                format!("safety check failed: {}", original.display()),
             ));
             continue;
         }
@@ -191,7 +191,7 @@ fn restore_session(
             all_ok = false;
             outcome.failed.push((
                 session.display_name.clone(),
-                format!("공유 기록 병합 실패: {e}"),
+                format!("could not merge the shared record: {e}"),
             ));
         }
     }

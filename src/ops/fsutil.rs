@@ -115,37 +115,36 @@ pub fn ensure_within(root: &Path, target: &Path) -> Result<()> {
         .components()
         .any(|c| matches!(c, Component::ParentDir))
     {
-        bail!("경로에 상위 참조(..)가 있습니다: {}", target.display());
+        bail!(
+            "path contains a parent reference (..): {}",
+            target.display()
+        );
     }
     let root_c = std::fs::canonicalize(root)
-        .with_context(|| format!("기준 경로를 확인할 수 없습니다: {}", root.display()))?;
+        .with_context(|| format!("could not resolve the base path: {}", root.display()))?;
     let parent = target
         .parent()
-        .ok_or_else(|| anyhow::anyhow!("경로에 부모가 없습니다: {}", target.display()))?;
+        .ok_or_else(|| anyhow::anyhow!("path has no parent: {}", target.display()))?;
     let parent_c = std::fs::canonicalize(parent)
-        .with_context(|| format!("상위 경로를 확인할 수 없습니다: {}", parent.display()))?;
+        .with_context(|| format!("could not resolve the parent path: {}", parent.display()))?;
     let name = target
         .file_name()
-        .ok_or_else(|| anyhow::anyhow!("경로에 이름이 없습니다: {}", target.display()))?;
+        .ok_or_else(|| anyhow::anyhow!("path has no file name: {}", target.display()))?;
     let full = parent_c.join(name);
 
     if full == root_c {
         bail!(
-            "데이터 루트 자체는 대상이 될 수 없습니다: {}",
+            "the data root itself cannot be a target: {}",
             full.display()
         );
     }
     if !full.starts_with(&root_c) {
-        bail!(
-            "{} 은(는) {} 밖에 있습니다",
-            full.display(),
-            root_c.display()
-        );
+        bail!("{} lies outside {}", full.display(), root_c.display());
     }
     if let Ok(meta) = std::fs::symlink_metadata(&full)
         && meta.file_type().is_symlink()
     {
-        bail!("심볼릭 링크는 정리 대상이 아닙니다: {}", full.display());
+        bail!("symlinks are not cleanup targets: {}", full.display());
     }
     Ok(())
 }

@@ -39,14 +39,14 @@ pub enum ArtifactKind {
 impl ArtifactKind {
     pub fn label(&self) -> &'static str {
         match self {
-            ArtifactKind::Transcript => "대화 기록",
-            ArtifactKind::SessionDir => "세션 폴더",
-            ArtifactKind::Task => "작업",
-            ArtifactKind::Team => "팀",
-            ArtifactKind::SessionEnv => "환경",
-            ArtifactKind::FileHistory => "파일 이력",
-            ArtifactKind::Todo => "할 일",
-            ArtifactKind::Debug => "디버그",
+            ArtifactKind::Transcript => "transcript",
+            ArtifactKind::SessionDir => "session folder",
+            ArtifactKind::Task => "tasks",
+            ArtifactKind::Team => "teams",
+            ArtifactKind::SessionEnv => "environment",
+            ArtifactKind::FileHistory => "file history",
+            ArtifactKind::Todo => "todos",
+            ArtifactKind::Debug => "debug",
         }
     }
 }

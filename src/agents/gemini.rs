@@ -74,7 +74,7 @@ fn analyze_chat_json(path: &Path) -> Analysis {
         Err(e) => return Analysis::Unreadable(describe_io_error(&e)),
     };
     let Ok(v) = serde_json::from_str::<Value>(&text) else {
-        return Analysis::Unreadable("JSON 을 이해할 수 없습니다".into());
+        return Analysis::Unreadable("could not parse the JSON".into());
     };
 
     let mut info = ParsedInfo::default();
@@ -85,7 +85,7 @@ fn analyze_chat_json(path: &Path) -> Analysis {
         .find_map(|k| v.get(*k).and_then(Value::as_array));
 
     let Some(turns) = turns else {
-        return Analysis::Unreadable("대화 기록을 찾지 못했습니다".into());
+        return Analysis::Unreadable("no conversation records found".into());
     };
 
     for turn in turns {

@@ -12,8 +12,8 @@ fn main() {
             "-h" | "--help" => return print_help(),
             "-V" | "--version" => return println!("sclean {}", env!("CARGO_PKG_VERSION")),
             other => {
-                eprintln!("알 수 없는 인자입니다: {other}");
-                eprintln!("`sclean --help` 를 확인하세요.");
+                eprintln!("unknown argument: {other}");
+                eprintln!("Run `sclean --help` for usage.");
                 std::process::exit(2);
             }
         }
@@ -22,7 +22,7 @@ fn main() {
     let paths = match Paths::discover() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("경로를 확인하지 못했습니다: {e:#}");
+            eprintln!("could not resolve paths: {e:#}");
             std::process::exit(1);
         }
     };
@@ -43,30 +43,36 @@ fn main() {
 
     if let Err(e) = ui::run(paths.clone()) {
         logging::error(&format!("fatal: {e:#}"));
-        eprintln!("오류: {e:#}");
-        eprintln!("로그: {}", paths.log_file().display());
+        eprintln!("error: {e:#}");
+        eprintln!("log: {}", paths.log_file().display());
         std::process::exit(1);
     }
 }
 
 fn print_help() {
     println!(
-        "sclean {} — Claude Code 세션 정리 도구
+        "sclean {} — clean up the sessions your coding agents leave behind
 
-사용법:
-  sclean              TUI를 엽니다
-  sclean --help       이 도움말
-  sclean --version    버전
+USAGE
+  sclean              open the terminal UI
+  sclean --help       this help
+  sclean --version    version
 
-조작:
-  ↑ ↓ 이동   Space 선택   A 추천 전체   D 정리
-  T 휴지통   F 추천 기준   / 검색   ? 도움말   Q 종료
+KEYS
+  \u{2191} \u{2193} move   \u{2192} sessions   \u{2190} projects   Space select
+  A suggested   D clean   T trash   F rules   ? help   Q quit
 
-환경변수:
-  SCLEAN_CLAUDE_DIR   Claude 데이터 위치 (기본: ~/.claude)
-  SCLEAN_DATA_DIR     sclean 저장소 (기본: ~/Library/Application Support/sclean)
+AGENTS
+  Claude Code, Codex, Gemini CLI, Copilot CLI, Continue
+  Only agents that store one session per file are supported.
 
-네트워크를 사용하지 않으며 모든 데이터는 이 Mac에만 저장됩니다.",
+ENVIRONMENT
+  SCLEAN_HOME         where agent data lives (default: your home directory)
+  SCLEAN_CLAUDE_DIR   Claude Code data only (default: ~/.claude)
+  SCLEAN_DATA_DIR     sclean's own storage
+                      (default: ~/Library/Application Support/sclean, ~/.local/share/sclean on Linux)
+
+No network access. Everything stays on this machine.",
         env!("CARGO_PKG_VERSION")
     );
 }

@@ -52,9 +52,9 @@ pub enum SkipReason {
 impl SkipReason {
     pub fn label(&self) -> String {
         match self {
-            SkipReason::Changed => "스캔 이후 변경됨".into(),
-            SkipReason::Missing => "파일이 이미 없음".into(),
-            SkipReason::CoveredByAnother => "상위 세션과 함께 정리됨".into(),
+            SkipReason::Changed => "changed since the scan".into(),
+            SkipReason::Missing => "files are already gone".into(),
+            SkipReason::CoveredByAnother => "cleaned together with its parent session".into(),
             SkipReason::Blocked(b) => b.label().to_string(),
         }
     }
@@ -216,11 +216,11 @@ pub fn execute_with(
     for t in &ready {
         // 각 세션은 자기 에이전트의 데이터 루트 안에만 있어야 한다.
         let root = crate::agents::root_of(paths, t.session.agent)
-            .ok_or_else(|| anyhow::anyhow!("알 수 없는 에이전트입니다: {}", t.session.agent))?;
+            .ok_or_else(|| anyhow::anyhow!("unknown agent: {}", t.session.agent))?;
         for a in &t.session.artifacts {
             fsutil::ensure_within(&root, &a.path).with_context(|| {
                 format!(
-                    "안전 검증 실패 — 작업을 실행하지 않았습니다 (세션 {})",
+                    "safety check failed - nothing was run (session {})",
                     t.session.id
                 )
             })?;
@@ -276,7 +276,7 @@ pub fn execute_with(
 
     manifest
         .save(&op_dir)
-        .with_context(|| format!("작업 기록을 저장하지 못했습니다: {}", op_dir.display()))?;
+        .with_context(|| format!("could not write the operation record: {}", op_dir.display()))?;
     logging::info(&format!(
         "cleanup start op={op_id} mode={:?} sessions={} files={}",
         mode,
@@ -299,7 +299,7 @@ pub fn execute_with(
                     moved.push((original, stored));
                 }
                 Err(e) => {
-                    failure = Some(format!("{} 이동 실패: {e}", original.display()));
+                    failure = Some(format!("could not move {}: {e}", original.display()));
                     break 'outer;
                 }
             }
@@ -314,7 +314,7 @@ pub fn execute_with(
                 backup = b.clone();
                 manifest.shared_backup = b.map(|p| p.to_string_lossy().into_owned());
             }
-            Err(e) => failure = Some(format!("공유 기록 교체 실패: {e}")),
+            Err(e) => failure = Some(format!("could not replace the shared record: {e}")),
         }
     }
 
@@ -335,7 +335,7 @@ pub fn execute_with(
         let _ = manifest.save(&op_dir);
         outcome.rolled_back = recovered;
         outcome.needs_attention = !recovered;
-        outcome.failed.push(("정리 작업".to_string(), msg));
+        outcome.failed.push(("cleanup".to_string(), msg));
         for t in &ready {
             outcome
                 .skipped
@@ -369,8 +369,12 @@ pub fn execute_with(
 
     // --- 8~9단계 ---
     if mode == CleanupMode::Permanent {
-        fsutil::remove_path(&op_dir)
-            .with_context(|| format!("작업 폴더를 지우지 못했습니다: {}", op_dir.display()))?;
+        fsutil::remove_path(&op_dir).with_context(|| {
+            format!(
+                "could not remove the operation folder: {}",
+                op_dir.display()
+            )
+        })?;
     }
 
     logging::info(&format!(

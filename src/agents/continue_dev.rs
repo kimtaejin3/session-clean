@@ -49,7 +49,7 @@ fn analyze_session_json(path: &std::path::Path) -> Analysis {
         Err(e) => return Analysis::Unreadable(describe_io_error(&e)),
     };
     let Ok(v) = serde_json::from_str::<Value>(&text) else {
-        return Analysis::Unreadable("JSON 을 이해할 수 없습니다".into());
+        return Analysis::Unreadable("could not parse the JSON".into());
     };
 
     let mut info = ParsedInfo::default();

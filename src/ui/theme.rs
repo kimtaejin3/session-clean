@@ -29,14 +29,24 @@ pub const WIDE_ENOUGH: u16 = 100;
 /// 이 폭 미만이면 프로젝트 패널을 접고 한 줄 헤더로 바꾼다.
 pub const TWO_PANE: u16 = 72;
 
-/// `92일 전`, `3시간 전`, `방금`.
+/// `1 session` / `3 sessions`. Counts show up all over the interface,
+/// and "1 sessions" reads like a bug even when nothing is wrong.
+pub fn count(n: usize, singular: &str) -> String {
+    if n == 1 {
+        format!("1 {singular}")
+    } else {
+        format!("{n} {singular}s")
+    }
+}
+
+/// `92d ago`, `3h ago`, `just now`.
 pub fn relative_time(now_secs: i64, then_secs: i64) -> String {
     let d = now_secs.saturating_sub(then_secs).max(0);
     match d {
-        0..=59 => "방금".to_string(),
-        60..=3599 => format!("{}분 전", d / 60),
-        3600..=86_399 => format!("{}시간 전", d / 3600),
-        _ => format!("{}일 전", d / 86_400),
+        0..=59 => "just now".to_string(),
+        60..=3599 => format!("{}m ago", d / 60),
+        3600..=86_399 => format!("{}h ago", d / 3600),
+        _ => format!("{}d ago", d / 86_400),
     }
 }
 
@@ -96,13 +106,20 @@ mod tests {
 
     #[test]
     fn relative_time_reads_naturally() {
-        assert_eq!(relative_time(1000, 1000), "방금");
-        assert_eq!(relative_time(10_000, 10_000 - 120), "2분 전");
-        assert_eq!(relative_time(100_000, 100_000 - 7200), "2시간 전");
+        assert_eq!(relative_time(1000, 1000), "just now");
+        assert_eq!(relative_time(10_000, 10_000 - 120), "2m ago");
+        assert_eq!(relative_time(100_000, 100_000 - 7200), "2h ago");
         assert_eq!(
             relative_time(10_000_000, 10_000_000 - 92 * 86_400),
-            "92일 전"
+            "92d ago"
         );
+    }
+
+    #[test]
+    fn counts_are_pluralised() {
+        assert_eq!(count(0, "session"), "0 sessions");
+        assert_eq!(count(1, "session"), "1 session");
+        assert_eq!(count(2, "file"), "2 files");
     }
 
     #[test]

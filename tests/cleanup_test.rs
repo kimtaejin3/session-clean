@@ -96,7 +96,7 @@ fn moves_multiple_sessions_to_trash_with_manifest() {
         ops[0].manifest.sessions[0]
             .reasons
             .iter()
-            .any(|r| r.contains("마지막 활동 후")),
+            .any(|r| r.contains("last active")),
         "추천 이유가 기록되어야 한다"
     );
 }
@@ -312,7 +312,10 @@ fn refuses_targets_outside_the_claude_dir() {
 
     let err = execute(&f.paths(), all, CleanupMode::Trash, &LiveSessions::empty())
         .expect_err("안전 검증에 걸려야 한다");
-    assert!(format!("{err:#}").contains("안전 검증 실패"), "{err:#}");
+    assert!(
+        format!("{err:#}").contains("safety check failed"),
+        "{err:#}"
+    );
     assert!(outside.exists(), "프로젝트 소스는 절대 건드리지 않는다");
     assert!(
         trash::list(&f.paths()).is_empty(),

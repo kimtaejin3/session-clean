@@ -38,17 +38,17 @@ pub enum Reason {
 impl Reason {
     pub fn label(&self) -> String {
         match self {
-            Reason::Old { days } => format!("마지막 활동 후 {days}일 경과"),
+            Reason::Old { days } => format!("last active {days} days ago"),
             Reason::MissingProject { path } => {
-                format!("프로젝트 경로 없음: {}", path.display())
+                format!("project path is gone: {}", path.display())
             }
             Reason::ShortSession { user_messages } => {
-                format!("사용자 메시지 {user_messages}개, 도구 실행 없음")
+                format!("{user_messages} user message(s), no tool calls")
             }
-            Reason::FinishedSubagent => "종료된 하위 에이전트 세션".to_string(),
+            Reason::FinishedSubagent => "finished subagent session".to_string(),
             Reason::OrphanData { kinds } => {
                 let names: Vec<&str> = kinds.iter().map(|k| k.label()).collect();
-                format!("대화 기록 없이 남은 데이터: {}", names.join(", "))
+                format!("data left behind with no transcript: {}", names.join(", "))
             }
         }
     }
@@ -81,11 +81,11 @@ pub enum Blocker {
 impl Blocker {
     pub fn label(&self) -> &'static str {
         match self {
-            Blocker::Unparsable => "세션 형식을 분석할 수 없어 정리하지 않습니다",
-            Blocker::AmbiguousOwnership => "연결 데이터의 소유 세션을 확정할 수 없습니다",
-            Blocker::Running => "지금 실행 중인 세션입니다",
-            Blocker::ChangedSinceScan => "스캔 이후 파일이 변경되었습니다",
-            Blocker::NothingToClean => "정리할 파일이 없습니다",
+            Blocker::Unparsable => "the session format could not be parsed, so it is left alone",
+            Blocker::AmbiguousOwnership => "the owning session of its related data is unclear",
+            Blocker::Running => "this session is currently running",
+            Blocker::ChangedSinceScan => "files changed since the scan",
+            Blocker::NothingToClean => "there is nothing to clean",
         }
     }
 }
@@ -101,8 +101,8 @@ pub enum Caution {
 impl Caution {
     pub fn label(&self) -> &'static str {
         match self {
-            Caution::ProjectUnverified => "프로젝트 경로 확인 불가",
-            Caution::RecentlyActive => "최근 활동 중",
+            Caution::ProjectUnverified => "project path unconfirmed",
+            Caution::RecentlyActive => "active recently",
         }
     }
 }
@@ -143,7 +143,7 @@ impl Verdict {
             .collect::<Vec<_>>()
             .join(" · ");
         if let Some(c) = self.cautions.first() {
-            text.push_str(&format!(" (보류: {})", c.label()));
+            text.push_str(&format!(" (held back: {})", c.label()));
         }
         text
     }
@@ -297,8 +297,8 @@ mod tests {
     }
 
     #[test]
-    fn reason_labels_are_explainable_korean() {
-        assert_eq!(Reason::Old { days: 92 }.label(), "마지막 활동 후 92일 경과");
+    fn reason_labels_state_the_actual_reason() {
+        assert_eq!(Reason::Old { days: 92 }.label(), "last active 92 days ago");
     }
 
     #[test]
@@ -443,8 +443,8 @@ mod tests {
         s.project_exists = Some(false);
         let v = evaluate(&s, &cfg, NOW, &LiveSessions::empty());
         assert_eq!(v.reasons.len(), 3, "{:?}", v.reasons);
-        assert!(v.label().contains("마지막 활동 후 92일 경과"));
-        assert!(v.label().contains("프로젝트 경로 없음"));
+        assert!(v.label().contains("last active 92 days ago"));
+        assert!(v.label().contains("project path is gone"));
         assert_eq!(v.rule_ids(), "R1,R2,R4");
     }
 

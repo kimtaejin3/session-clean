@@ -7,22 +7,20 @@
 A local terminal UI for reviewing the sessions your coding agents leave behind, and clearing them out safely — with a reason shown for every suggestion.
 
 ```text
-┌ Projects 2/5 ──────────────┐┌ Codex · shop-api — 세션 2 ─────────────────── Trash: 0 ┐
-│  ── Claude Code            ││  [x] ★ 92일 전  로그인 리다이렉…  마지막 활동 후 92일…  │
-│  blog                      ││  [ ] ★ 45일 전  빌드 오류 질문    사용자 메시지 1개…    │
-│  shop-api        추천 2    ││                                                        │
+┌ Projects 2/5 ──────────────┐┌ Codex · shop-api — 2 sessions ─────────────── Trash: 0 ┐
+│  ── Claude Code            ││  [x] ★ 92d ago  Fix login redirect   last active 92 d… │
+│  blog                      ││  [ ] ★ 45d ago  Build error question 1 user message,… │
+│  shop-api          2 sugg  ││                                                        │
 │▶ ── Codex                  ││                                                        │
-│  shop-api        추천 2    ││                                                        │
-│  ── Gemini CLI (미검증)    ││                                                        │
-│  a1b2c3d4        확인불가  ││                                                        │
+│  shop-api          2 sugg  ││                                                        │
+│  ── Gemini CLI (unverified)││                                                        │
+│  a1b2c3d4          unknown ││                                                        │
 │  ── Continue               ││                                                        │
-│  shop-api        추천 1    ││                                                        │
+│  shop-api          1 sugg  ││                                                        │
 └────────────────────────────┘└────────────────────────────────────────────────────────┘
- 세션 9개 · 추천 5개 · 선택 1개 (1 KB)
- ↑↓ 세션  ← 프로젝트로  Space 선택  A 추천전체  D 정리  T 휴지통  F 기준  ? 도움말  Q 종료
+ 9 sessions · 5 suggested · 1 selected (1 KB)
+ ↑↓ sessions  ← projects  Space select  A suggested  D clean  T trash  F rules  ? help  Q quit
 ```
-
-> The interface is currently in Korean. An English UI is planned — see [Roadmap](#roadmap).
 
 State is readable from symbols alone, never from color: `[x]` selected, `[ ]` not selected, `[-]` cannot be cleaned, `★` suggested, `!` unparseable, `▶` running.
 
@@ -177,7 +175,7 @@ Your project source files are **never read or written**, only checked for existe
 ## Development
 
 ```sh
-cargo test                       # 211 tests
+cargo test                       # 212 tests
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 cargo test --release --test perf_test -- --nocapture   # scan time for 2,000 sessions
@@ -230,7 +228,6 @@ npm login
 
 Considered only if people keep asking:
 
-- English interface
 - Session search
 - Agents that store sessions in SQLite (Cursor, OpenCode, Goose)
 - Native Windows support

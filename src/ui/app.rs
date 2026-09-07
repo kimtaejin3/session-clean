@@ -202,9 +202,9 @@ impl App {
         let n = self.result.session_count();
         let rec = self.recommended_ids().len();
         self.status = if self.selected.is_empty() {
-            format!("세션 {n}개 · 추천 {rec}개 (아무것도 선택되지 않음)")
+            format!("{n} sessions · {rec} suggested (nothing selected)")
         } else {
-            format!("세션 {n}개 · 추천 {rec}개")
+            format!("{n} sessions · {rec} suggested")
         };
     }
 
@@ -311,7 +311,7 @@ impl App {
                         self.selected.insert(id);
                     }
                 }
-                self.status = format!("{}개 선택됨", self.selected.len());
+                self.status = format!("{} selected", self.selected.len());
             }
         }
     }
@@ -328,7 +328,7 @@ impl App {
                 .verdicts
                 .get(id)
                 .and_then(|v| v.blockers.first().map(|b| b.label()))
-                .unwrap_or("선택할 수 없습니다");
+                .unwrap_or("cannot be selected");
             self.status = why.to_string();
         }
     }
@@ -342,7 +342,7 @@ impl App {
     pub fn toggle_all_recommended(&mut self) {
         let ids = self.recommended_ids();
         if ids.is_empty() {
-            self.status = "추천 항목이 없습니다".into();
+            self.status = "Nothing is suggested".into();
             return;
         }
         let all_on = ids.iter().all(|i| self.selected.contains(i));
@@ -362,9 +362,12 @@ impl App {
             .filter(|p| self.recommended_in(p) > 0)
             .count();
         self.status = if all_on {
-            format!("추천 {count}개 선택 해제")
+            format!("Deselected {count} suggested")
         } else {
-            format!("추천 {count}개 선택 (프로젝트 {projects}개)")
+            format!(
+                "Selected {count} suggested across {}",
+                crate::ui::theme::count(projects, "project")
+            )
         };
     }
 
@@ -427,7 +430,7 @@ impl App {
     /// `→` — 프로젝트에서 세션 목록으로.
     pub fn focus_sessions(&mut self) {
         if self.visible_sessions().is_empty() {
-            self.status = "이 프로젝트에는 보여줄 세션이 없습니다".into();
+            self.status = "This project has no sessions to show".into();
             return;
         }
         self.focus = Focus::Sessions;
@@ -443,7 +446,7 @@ impl App {
     pub fn open_confirm(&mut self) {
         let targets = self.selected_targets();
         if targets.is_empty() {
-            self.status = "선택된 세션이 없습니다".into();
+            self.status = "No sessions selected".into();
             return;
         }
         self.confirm = ConfirmState {
@@ -461,7 +464,7 @@ impl App {
 
     pub fn run_cleanup(&mut self) {
         if !self.confirm.can_execute() {
-            self.status = format!("계속하려면 {DELETE_WORD} 를 입력하세요");
+            self.status = format!("Type {DELETE_WORD} to continue");
             return;
         }
         let targets = self.selected_targets();
@@ -469,7 +472,7 @@ impl App {
         match cleanup::execute(&self.paths, targets, mode, &self.live) {
             Ok(outcome) => {
                 self.status = format!(
-                    "{} 완료 — 성공 {} · 제외 {} · 실패 {}",
+                    "{} done — {} succeeded · {} skipped · {} failed",
                     mode.label(),
                     outcome.succeeded.len(),
                     outcome.skipped.len(),
@@ -481,7 +484,7 @@ impl App {
             Err(e) => {
                 logging::error(&format!("cleanup aborted: {e:#}"));
                 self.outcome = Some(CleanupOutcome {
-                    failed: vec![("정리 작업".into(), format!("{e:#}"))],
+                    failed: vec![("cleanup".into(), format!("{e:#}"))],
                     ..Default::default()
                 });
                 self.status = format!("{e:#}");
@@ -568,7 +571,7 @@ impl App {
     pub fn restore_selection(&mut self) {
         let selection = self.trash_selection();
         if selection.is_empty() {
-            self.status = "복원할 항목이 없습니다".into();
+            self.status = "Nothing to restore".into();
             return;
         }
         let mut combined = RestoreOutcome::default();
@@ -584,10 +587,13 @@ impl App {
             }
         }
         self.status = if combined.conflicts.is_empty() {
-            format!("{}개 세션을 복원했습니다", combined.restored.len())
+            format!(
+                "Restored {}",
+                crate::ui::theme::count(combined.restored.len(), "session")
+            )
         } else {
             format!(
-                "{}개 복원 · {}개는 같은 경로에 파일이 있어 건너뛰었습니다",
+                "Restored {} · skipped {} because something already sits at the original path",
                 combined.restored.len(),
                 combined.conflicts.len()
             )
@@ -601,7 +607,7 @@ impl App {
     pub fn purge_selection(&mut self) {
         let selection = self.trash_selection();
         if selection.is_empty() {
-            self.status = "삭제할 항목이 없습니다".into();
+            self.status = "Nothing to delete".into();
             return;
         }
         let mut freed = 0u64;
@@ -612,7 +618,7 @@ impl App {
             }
         }
         self.status = format!(
-            "휴지통에서 {} 를 영구 삭제했습니다",
+            "Permanently deleted {} from the trash",
             crate::ops::fsutil::human_bytes(freed)
         );
         self.trash_selected.clear();
@@ -641,13 +647,13 @@ impl App {
         }
         self.pending_ops = trash::incomplete(&self.paths);
         self.rescan();
-        self.status = format!("중단된 작업 복구: {restored}개 복원 · {conflicts}개 충돌");
+        self.status = format!("Recovery: {restored} restored · {conflicts} conflicted");
         self.screen = Screen::Sessions;
     }
 
     pub fn skip_recovery(&mut self) {
         self.screen = Screen::Sessions;
-        self.status = "복구를 건너뛰었습니다. 다음 실행에서 다시 안내합니다".into();
+        self.status = "Skipped recovery. You will be asked again next time".into();
     }
 
     // ---------- 추천 기준 ----------
@@ -674,7 +680,7 @@ impl App {
 
     fn persist_config(&mut self) {
         if let Err(e) = self.config.save(&self.paths) {
-            self.status = format!("설정을 저장하지 못했습니다: {e:#}");
+            self.status = format!("Could not save settings: {e:#}");
         }
         self.recompute_verdicts();
         self.clamp_cursors();
